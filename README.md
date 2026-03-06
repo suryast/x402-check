@@ -10,7 +10,7 @@
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js >= 18" /></a>
 </p>
 
-**CLI + library + GitHub Action + Chrome Extension + hosted API** to validate [x402 HTTP payment protocol](https://x402.org) endpoints.
+**CLI + library + GitHub Action + Chrome Extension** to validate [x402 HTTP payment protocol](https://x402.org) endpoints.
 
 Detects x402-enabled endpoints via **headers and JSON body**, decodes `PaymentRequired` payloads, validates schema compliance, checks facilitator reachability, generates status badges, and monitors endpoints in watch mode.
 
@@ -25,7 +25,6 @@ graph TB
         LIB["📦 npm Library<br/>import { checkX402 }"]
         ACTION["⚙️ GitHub Action<br/>CI/CD pipeline"]
         EXT["🔌 Chrome Extension<br/>Browser detection"]
-        API["☁️ Hosted API<br/>CF Worker"]
     end
 
     subgraph "Target"
@@ -43,10 +42,7 @@ graph TB
     ACTION -->|probe| SITE
     EXT -->|probe| SITE
     EXT -->|discover| WELL
-    API -->|probe| SITE
-    API -->|generate| BADGE
     EXT -->|submit listing| A2A
-    CLI -->|"--badge"| BADGE
 ```
 
 ## How x402 Works
@@ -103,7 +99,7 @@ flowchart LR
 | **Library** | Importable npm package | `src/index.ts` |
 | **GitHub Action** | CI/CD integration, zero deps | `action/` |
 | **Chrome Extension** | Browser-native x402 detection | `extension/` |
-| **Hosted API** | Cloudflare Worker with badges & rate limiting | `worker/` |
+
 
 ---
 
@@ -363,52 +359,6 @@ flowchart TD
 - Extension only makes HEAD/GET probes to detect x402 headers
 
 ---
-
-## Hosted API
-
-Cloudflare Worker providing a public x402 checking API with rate limiting and badge generation.
-
-### Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/check?url=<url>` | Check single URL |
-| `POST` | `/check/batch` | Check multiple URLs (max 10) |
-| `GET` | `/badge/<domain>.svg` | Status badge for README/docs |
-
-### Examples
-
-```bash
-# Single check
-curl "https://x402-check-api.hello-bb8.workers.dev/check?url=https://pay.skillpacks.dev/api/skills/security-suite"
-
-# Batch check
-curl -X POST "https://x402-check-api.hello-bb8.workers.dev/check/batch" \
-  -H "Content-Type: application/json" \
-  -d '{"urls": ["https://api.a.com/paid", "https://api.b.com/paid"]}'
-
-# Embed badge in your README
-![x402 status](https://x402-check-api.hello-bb8.workers.dev/badge/pay.skillpacks.dev.svg)
-```
-
-### Rate Limits
-
-- **100 requests/day** per IP (KV-backed)
-- Batch endpoint counts as 1 request
-- Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
-
-### Deploy
-
-```bash
-cd worker
-npm install
-wrangler kv:namespace create RATE_LIMITS
-wrangler kv:namespace create RATE_LIMITS --preview
-# Update wrangler.toml with the KV namespace IDs
-wrangler deploy
-```
-
-**Live API:** [`https://x402-check-api.hello-bb8.workers.dev`](https://x402-check-api.hello-bb8.workers.dev/health)
 
 ---
 
