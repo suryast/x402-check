@@ -106,6 +106,42 @@ chrome.notifications.onButtonClicked.addListener((notifId, btnIndex) => {
 // x402 probe
 // ---------------------------------------------------------------------------
 async function probeForX402(url) {
+  // First: try direct page probe (catches pages that return 402 on GET)
+  const directResult = await directProbe(url);
+  if (directResult) return directResult;
+
+  // Second: try /.well-known/x402.json discovery
+  try {
+    const origin = new URL(url).origin;
+    const wellKnown = await fetch(`${origin}/.well-known/x402.json`, {
+      signal: AbortSignal.timeout(3000),
+      headers: { 'X-Client': 'x402-detector-extension/1.0.0' },
+    });
+    if (wellKnown.ok) {
+      const discovery = await wellKnown.json();
+      if (discovery.x402Version && discovery.endpoints?.length > 0) {
+        const ep = discovery.endpoints[0];
+        return {
+          url: origin + ep.path,
+          detectedAt: new Date().toISOString(),
+          network: ep.network || 'unknown',
+          scheme: 'exact',
+          amount: ep.price || 'unknown',
+          resource: origin + ep.path,
+          description: ep.description || null,
+          payTo: [],
+          raw: discovery,
+          facilitator: null,
+          discoveredVia: 'well-known',
+        };
+      }
+    }
+  } catch (_) { /* well-known not available */ }
+
+  return null;
+}
+
+async function directProbe(url) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -114,7 +150,7 @@ async function probeForX402(url) {
       method: 'GET',
       signal: controller.signal,
       redirect: 'follow',
-      headers: { 'X-Client': 'x402-detector-extension/1.0.0' }, // #9 (User-Agent is forbidden in fetch)
+      headers: { 'X-Client': 'x402-detector-extension/1.0.0' },
     });
 
     clearTimeout(timeout);
