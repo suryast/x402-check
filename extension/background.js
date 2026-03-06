@@ -17,6 +17,31 @@ chrome.storage.local.get('notifiedUrls').then((data) => {
   notifiedUrls = new Set(data.notifiedUrls || []);
 });
 
+// Set default red badge on all existing tabs at startup/install
+chrome.runtime.onInstalled.addListener(async () => {
+  await chrome.action.setBadgeText({ text: 'OFF' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+  // Probe all existing tabs
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+      await updateBadge(tab.id, false);
+      try {
+        const result = await probeForX402(tab.url);
+        tabCache[tab.id] = result;
+        if (result) {
+          await updateBadge(tab.id, true);
+          await storeDiscovery(result);
+        }
+      } catch (_) {}
+    }
+  }
+});
+
+// Also set default on service worker startup (survives SW restarts)
+chrome.action.setBadgeText({ text: 'OFF' });
+chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+
 // ---------------------------------------------------------------------------
 // webRequest listener — catches 402 on the wire before the page commits
 // ---------------------------------------------------------------------------
@@ -201,7 +226,7 @@ async function updateBadge(tabId, detected) {
     await chrome.action.setBadgeBackgroundColor({ tabId, color: '#22c55e' });
     await chrome.action.setTitle({ tabId, title: 'x402 detected — click for details' });
   } else {
-    await chrome.action.setBadgeText({ tabId, text: '—' });
+    await chrome.action.setBadgeText({ tabId, text: 'OFF' });
     await chrome.action.setBadgeBackgroundColor({ tabId, color: '#ef4444' });
     await chrome.action.setTitle({ tabId, title: 'x402 Detector — no x402 on this page' });
   }
