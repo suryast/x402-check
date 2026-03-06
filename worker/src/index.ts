@@ -85,6 +85,62 @@ export function extractDomain(raw: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// SSRF Protection — private/loopback IP blocklist (#1, #6)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the hostname is a private/loopback/link-local address
+ * that must not be fetched (SSRF protection).
+ * Checks IPv4 private ranges, IPv6 loopback, ULA (fc00::/7), and localhost.
+ */
+export function isPrivateHostname(hostname: string): boolean {
+  // Strip IPv6 brackets: [::1] → ::1
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+
+  // Reject localhost and 0.0.0.0 by name
+  if (h === 'localhost' || h === '0.0.0.0') return true;
+
+  // IPv6 loopback and ULA (fc00::/7 covers fc** and fd**)
+  if (h === '::1' || h.startsWith('fc') || h.startsWith('fd')) return true;
+
+  // IPv4 private ranges
+  const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [a, b] = [Number(ipv4[1]), Number(ipv4[2])];
+    return (
+      a === 0 ||                              // 0.0.0.0/8
+      a === 10 ||                             // 10.0.0.0/8
+      a === 127 ||                            // 127.0.0.0/8 loopback
+      (a === 169 && b === 254) ||             // 169.254.0.0/16 link-local
+      (a === 172 && b >= 16 && b <= 31) ||    // 172.16.0.0/12
+      (a === 192 && b === 168)                // 192.168.0.0/16
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Returns an error message if the URL is blocked for SSRF reasons, or null if safe.
+ * Validates https:// scheme and blocks private/loopback hostnames.
+ */
+function ssrfGuard(raw: string, requireHttps = false): string | null {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return 'Invalid URL';
+  }
+  if (requireHttps && u.protocol !== 'https:') {
+    return 'URL must use https://';
+  }
+  if (isPrivateHostname(u.hostname)) {
+    return `Blocked: private/loopback hostname (${u.hostname})`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Rate Limiting (KV-backed, per-IP, 100 req/day free)
 // ---------------------------------------------------------------------------
 
@@ -163,12 +219,19 @@ async function probeFacilitator(
     return { reachable: false };
   }
 
+  // #6: Validate facilitator URL is https:// and not a private IP (SSRF)
+  const blocked = ssrfGuard(facilitatorUrl, /* requireHttps */ true);
+  if (blocked) {
+    return { reachable: false, url: facilitatorUrl };
+  }
+
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 5000);
     const res = await fetch(facilitatorUrl, {
       method: 'HEAD',
       signal: ctrl.signal,
+      redirect: 'manual', // #11: do not follow redirects
       headers: { 'User-Agent': USER_AGENT },
     });
     clearTimeout(timer);
@@ -180,6 +243,20 @@ async function probeFacilitator(
 
 export async function checkUrl(url: string): Promise<X402Result> {
   const checkedAt = new Date().toISOString();
+
+  // #1: Block SSRF — reject private/loopback hostnames before fetching
+  const blocked = ssrfGuard(url);
+  if (blocked) {
+    return {
+      url,
+      x402: false,
+      paymentInfo: null,
+      facilitator: null,
+      checkedAt,
+      error: `Blocked: ${blocked}`,
+    };
+  }
+
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), CHECK_TIMEOUT_MS);
 
@@ -187,7 +264,7 @@ export async function checkUrl(url: string): Promise<X402Result> {
     const response = await fetch(url, {
       method: 'GET',
       signal: ctrl.signal,
-      redirect: 'follow',
+      redirect: 'manual', // #11: do not follow redirects to avoid redirect-based SSRF
       headers: { 'User-Agent': USER_AGENT },
     });
     clearTimeout(timer);
@@ -246,7 +323,18 @@ export async function checkUrl(url: string): Promise<X402Result> {
 // Badge SVG Generation
 // ---------------------------------------------------------------------------
 
+/** Escape special XML/HTML characters to prevent injection in SVG output. (#14) */
+export function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 export function generateBadgeSvg(domain: string, supported: boolean): string {
+  const safeDomain = escapeXml(domain); // #14: escape domain before embedding in SVG
   const label = 'x402';
   const message = supported ? 'supported' : 'not supported';
   const color = supported ? '#4c9e5f' : '#e05d44';
@@ -273,7 +361,7 @@ export function generateBadgeSvg(domain: string, supported: boolean): string {
   <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110">
     <text aria-hidden="true" x="${labelX * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(labelWidth - 10) * 10}" lengthAdjust="spacing">${label}</text>
     <text x="${labelX * 10}" y="140" transform="scale(.1)" fill="#fff" textLength="${(labelWidth - 10) * 10}" lengthAdjust="spacing">${label}</text>
-    <text aria-hidden="true" x="${messageX * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(messageWidth - 10) * 10}" lengthAdjust="spacing">${domain}: ${message}</text>
+    <text aria-hidden="true" x="${messageX * 10}" y="150" fill="#010101" fill-opacity=".3" transform="scale(.1)" textLength="${(messageWidth - 10) * 10}" lengthAdjust="spacing">${safeDomain}: ${message}</text>
     <text x="${messageX * 10}" y="140" transform="scale(.1)" fill="#fff" textLength="${(messageWidth - 10) * 10}" lengthAdjust="spacing">${message}</text>
   </g>
 </svg>`;
@@ -330,10 +418,8 @@ export default {
     let rateLimitHeaders: Record<string, string> = {};
 
     if (path !== '/health') {
-      const ip =
-        request.headers.get('CF-Connecting-IP') ||
-        request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||
-        'unknown';
+      // #3: Use ONLY CF-Connecting-IP — do NOT trust X-Forwarded-For (rate limit bypass)
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
       const rl = await checkRateLimit(env.RATE_LIMITS, ip, limitPerDay);
       rateLimitHeaders = {

@@ -129,6 +129,27 @@ convert -background none -resize 128x128 icon.svg icon128.png
 
 ---
 
+## Permissions
+
+### Why `<all_urls>` host permission is required (#4)
+
+The extension uses `<all_urls>` in `host_permissions` because:
+
+1. **`chrome.webRequest.onCompleted`** — to intercept HTTP 402 responses on *any* tab the user visits,
+   the extension must be able to observe responses from any origin. There is no narrower permission
+   that allows this for arbitrary sites the user browses.
+2. **Probe fetch in background.js** — after detecting a 402, the extension sends a `GET` request to the
+   same URL to decode the `x-payment-required` header. Because users can visit *any* website, the
+   extension cannot predict which origins need to be allowed at install time.
+
+The extension does **not** read page content, inject scripts into pages, or send browsing data to any
+server without the user explicitly clicking "Submit to a2alist.ai".
+
+If Chrome ever supports a "request host permission on first use" flow adequate for `webRequest`, we
+will adopt that narrower model.
+
+---
+
 ## Related
 
 - [x402-check CLI](https://www.npmjs.com/package/x402-check) — command-line checker for x402 endpoints

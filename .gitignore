@@ -5,3 +5,4 @@ dist/
 .DS_Store
 SHAPING.md
 *.tgz
+.wrangler/

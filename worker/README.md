@@ -205,11 +205,20 @@ X-RateLimit-Reset: 1705363200
 
 ---
 
+## CORS Policy
+
+The API uses **fully open CORS** (`Access-Control-Allow-Origin: *`). This is intentional:
+
+- The x402-check API is a **public read-only utility** — anyone can check whether a URL supports x402.
+- There is no authentication or user-specific data returned; every response is safe to expose cross-origin.
+- Browser-side tooling (extensions, web apps, dashboards) needs to call this API directly without a server proxy.
+- If you self-host and want to restrict origins, add your own `Access-Control-Allow-Origin` logic in the worker's `corsHeaders()` function.
+
 ## Constraints
 
 - **Timeout:** 10 seconds per URL check
 - **Max batch:** 10 URLs per POST /check/batch request
-- **CORS:** Open (all origins allowed) — suitable for browser-side calls
+- **CORS:** Open (all origins allowed) — intentionally public; see CORS Policy section above
 - **Rate limiting:** Per-IP, tracked via Cloudflare KV
 
 ---

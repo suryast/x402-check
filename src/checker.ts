@@ -39,15 +39,29 @@ export function decodePaymentRequired(header: string): PaymentRequired {
 /**
  * Check if the facilitator URL is reachable by sending a HEAD request.
  * HTTP 2xx/3xx = reachable, 4xx/5xx/timeout = not reachable (warning).
+ *
+ * #6: Only https:// facilitator URLs are accepted to prevent SSRF via HTTP downgrade.
  */
 export async function checkFacilitator(
   facilitatorUrl: string,
   timeout = 5000
 ): Promise<FacilitatorResult> {
+  // #6: Require https:// — reject plain http and other schemes
+  if (!facilitatorUrl.startsWith('https://')) {
+    return {
+      url: facilitatorUrl,
+      reachable: false,
+      error: 'Facilitator URL must use https://',
+    };
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
+    // #11: redirect: 'follow' is intentional here for the CLI library — the facilitator
+    // may legitimately redirect (e.g. http→https). The CLI does not expose user-controlled
+    // redirect targets, so the SSRF risk is lower than in the worker context.
     const response = await fetch(facilitatorUrl, {
       method: 'HEAD',
       signal: controller.signal,
@@ -80,6 +94,9 @@ export async function checkX402(url: string, options: CheckOptions = {}): Promis
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
+    // #11: redirect: 'follow' is kept for the CLI library. x402 endpoints may sit behind
+    // a load balancer that issues a redirect before serving the 402. The CLI operates on
+    // user-supplied URLs (not worker-proxied ones), so following redirects is acceptable.
     const response = await fetch(url, {
       method: 'GET',
       signal: controller.signal,

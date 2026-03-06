@@ -70,7 +70,7 @@ function checkUrl(url, timeout) {
 
     let req;
     try {
-      req = mod.request(url, { method: 'GET' }, (res) => {
+      req = mod.request(url, { method: 'GET', headers: { 'User-Agent': 'x402-check-action/1.0.0' } }, (res) => { // #8
         const status = res.statusCode || 0;
         const paymentHeader = res.headers['x-payment-required'];
 

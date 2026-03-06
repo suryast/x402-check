@@ -198,15 +198,32 @@ function showDetails(info) {
   if (info.payTo?.length)
     rows.push(['Pay to', `<span title="${esc(info.payTo[0].address)}">${esc(truncMid(info.payTo[0].address, 20))}</span>`]);
 
+  // #2: Validate facilitator URL is https:// before rendering as a link (XSS prevention)
   const facilitator = info.raw?.extra?.facilitator || info.raw?.facilitatorUrl;
-  if (facilitator)
-    rows.push(['Facilitator', `<a href="${esc(facilitator)}" target="_blank">${esc(truncateUrl(facilitator))}</a>`]);
+  if (facilitator) {
+    const fStr = String(facilitator);
+    if (fStr.startsWith('https://')) {
+      // Render as a clickable span; use chrome.tabs.create onclick (no raw href)
+      rows.push(['Facilitator', `<span class="facilitator-link" data-url="${esc(fStr)}" style="cursor:pointer;color:#22c55e;text-decoration:underline">${esc(truncateUrl(fStr))}</span>`]);
+    } else {
+      // Non-https: render as plain text only
+      rows.push(['Facilitator', esc(truncateUrl(fStr))]);
+    }
+  }
 
   rows.push(['Detected', relTime(info.detectedAt)]);
 
   detailGrid.innerHTML = rows.map(([l, v]) =>
     `<span class="detail-label">${l}</span><span class="detail-value">${v}</span>`
   ).join('');
+
+  // #2: Open facilitator links safely via chrome.tabs.create (no raw anchor href)
+  detailGrid.querySelectorAll('.facilitator-link').forEach((el) => {
+    el.addEventListener('click', () => {
+      const u = el.dataset.url;
+      if (u) chrome.tabs.create({ url: u });
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

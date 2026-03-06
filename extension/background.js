@@ -114,6 +114,7 @@ async function probeForX402(url) {
       method: 'GET',
       signal: controller.signal,
       redirect: 'follow',
+      headers: { 'User-Agent': 'x402-detector-extension/1.0.0' }, // #9
     });
 
     clearTimeout(timeout);
