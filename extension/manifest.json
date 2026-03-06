@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "x402 Detector",
   "version": "1.0.0",
-  "description": "Detects x402 payment-required endpoints while you browse. When a site charges with crypto, the icon lights up. Discover the full x402 agent directory at a2alist.ai.",
+  "description": "Detects x402 payment protocol endpoints while you browse. Green when found, red when not.",
   "permissions": [
     "activeTab",
     "storage",
