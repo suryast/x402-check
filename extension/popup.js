@@ -332,30 +332,17 @@ btnProbe.addEventListener('click', async () => {
 
 btnSubmit.addEventListener('click', async () => {
   if (!currentX402 || !currentUrl) return;
-  btnSubmit.disabled   = true;
-  btnSubmit.textContent = 'Submitting…';
-  try {
-    const payload = buildPayload(currentUrl, currentX402);
-    const resp    = await fetch(SUBMIT_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (resp.ok) {
-      showToast('✓ Submitted to a2alist.ai!');
-      btnSubmit.textContent = '✓ Submitted';
-    } else {
-      showToast('Submission prepared (API pending)');
-      console.log('[x402] payload:', payload);
-      btnSubmit.disabled   = false;
-      btnSubmit.textContent = 'Submit to a2alist.ai';
-    }
-  } catch {
-    console.log('[x402] API offline. Payload:', buildPayload(currentUrl, currentX402));
-    showToast('Saved locally (API offline)');
-    btnSubmit.disabled   = false;
-    btnSubmit.textContent = 'Submit to a2alist.ai';
-  }
+  const info = currentX402;
+  const params = new URLSearchParams({
+    url: currentUrl,
+    name: new URL(currentUrl).hostname,
+    description: info.description || `x402-enabled service on ${new URL(currentUrl).hostname}`,
+    protocol: 'x402',
+    category: 'ai',
+    network: info.network || 'unknown',
+    source: 'x402-extension',
+  });
+  chrome.tabs.create({ url: `${A2ALIST_URL}/submit?${params.toString()}` });
 });
 
 btnExport.addEventListener('click', async () => {
