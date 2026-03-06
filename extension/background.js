@@ -114,7 +114,7 @@ async function probeForX402(url) {
       method: 'GET',
       signal: controller.signal,
       redirect: 'follow',
-      headers: { 'User-Agent': 'x402-detector-extension/1.0.0' }, // #9
+      headers: { 'X-Client': 'x402-detector-extension/1.0.0' }, // #9 (User-Agent is forbidden in fetch)
     });
 
     clearTimeout(timeout);
