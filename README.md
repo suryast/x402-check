@@ -4,37 +4,144 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 
-CLI + library to check if URLs support the [x402 HTTP payment protocol](https://x402.org).
+**CLI + library + GitHub Action + Chrome Extension + hosted API** to validate [x402 HTTP payment protocol](https://x402.org) endpoints.
 
-Detects x402-enabled endpoints, decodes the `PaymentRequired` payload, validates schema compliance, and checks facilitator reachability — with colored output and JSON mode for CI/CD.
+Detects x402-enabled endpoints, decodes `PaymentRequired` payloads, validates schema compliance, checks facilitator reachability, generates status badges, and monitors endpoints in watch mode.
 
 ---
 
-## Install
+## Architecture
 
-```bash
-# Global CLI
-npm install -g x402-check
+```mermaid
+graph TB
+    subgraph "x402-check Ecosystem"
+        CLI["🖥️ CLI<br/>x402-check &lt;url&gt;"]
+        LIB["📦 npm Library<br/>import { checkX402 }"]
+        ACTION["⚙️ GitHub Action<br/>CI/CD pipeline"]
+        EXT["🔌 Chrome Extension<br/>Browser detection"]
+        API["☁️ Hosted API<br/>CF Worker"]
+    end
 
-# Or run without installing
-npx x402-check https://api.example.com/resource
+    subgraph "Target"
+        SITE["🌐 x402 Site<br/>HTTP 402 + headers"]
+        WELL["📋 .well-known/x402.json<br/>Discovery endpoint"]
+    end
+
+    subgraph "Integration"
+        A2A["🗂️ a2alist.ai<br/>x402 Directory"]
+        BADGE["🏷️ Status Badge<br/>SVG via API"]
+    end
+
+    CLI -->|probe| SITE
+    LIB -->|probe| SITE
+    ACTION -->|probe| SITE
+    EXT -->|probe| SITE
+    EXT -->|discover| WELL
+    API -->|probe| SITE
+    API -->|generate| BADGE
+    EXT -->|submit listing| A2A
+    CLI -->|"--badge"| BADGE
+```
+
+## How x402 Works
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as x402 Server
+    participant F as Facilitator
+    participant B as Blockchain
+
+    C->>S: GET /api/resource
+    S-->>C: 402 Payment Required<br/>x-payment-required: {accepts, facilitatorUrl}
+    
+    Note over C: x402-check detects this! ✅
+    
+    C->>F: POST /verify<br/>{payment proof}
+    F->>B: Verify on-chain
+    B-->>F: Confirmed ✅
+    F-->>C: Payment receipt
+    C->>S: GET /api/resource<br/>X-Payment: {receipt}
+    S-->>C: 200 OK + content
+```
+
+## Detection Flow
+
+```mermaid
+flowchart LR
+    A[Visit URL] --> B{GET returns 402?}
+    B -->|Yes| C[Decode x-payment-required header]
+    B -->|No| D{/.well-known/x402.json exists?}
+    D -->|Yes| E[Parse discovery document]
+    D -->|No| F[🔴 No x402]
+    C --> G[Validate schema]
+    E --> G
+    G --> H{Valid?}
+    H -->|Yes| I[Check facilitator reachability]
+    H -->|No| J[⚠️ Invalid schema]
+    I --> K[🟢 x402 Detected]
 ```
 
 ---
 
-## CLI Usage
+## Components
+
+| Component | Description | Location |
+|-----------|-------------|----------|
+| **CLI** | Command-line checker with colored output | `src/cli.ts` |
+| **Library** | Importable npm package | `src/index.ts` |
+| **GitHub Action** | CI/CD integration, zero deps | `action/` |
+| **Chrome Extension** | Browser-native x402 detection | `extension/` |
+| **Hosted API** | Cloudflare Worker with badges & rate limiting | `worker/` |
+
+---
+
+## Quick Start
+
+```bash
+# Install globally
+npm install -g x402-check
+
+# Check a URL
+x402-check https://pay.skillpacks.dev/api/skills/security-suite
+
+# Verbose: schema validation + facilitator check
+x402-check --verbose https://pay.skillpacks.dev/api/skills/security-suite
+
+# JSON output for CI
+x402-check --json https://api.example.com/resource | jq .
+```
+
+### Output
+
+```
+✅ x402 DETECTED  https://pay.skillpacks.dev/api/skills/security-suite
+  Status:      402
+  Network:     eip155:8453
+  Scheme:      exact
+  Amount:      990000
+  Resource:    https://pay.skillpacks.dev/api/skills/security-suite
+  Pay to:      0xb92aab592c...
+  Schema:      ✅ Valid
+  Facilitator: ✅ Reachable (HTTP 200)
+```
+
+---
+
+## CLI Reference
 
 ```bash
 x402-check [options] <url> [url...]
 ```
 
-### Options
-
 | Flag | Description |
 |------|-------------|
 | `--json` | Machine-readable JSON output |
-| `--timeout <ms>` | Request timeout in milliseconds (default: `10000`) |
-| `--verbose` | Show full response headers, schema validation, facilitator check |
+| `--verbose` | Schema validation + facilitator check |
+| `--timeout <ms>` | Request timeout (default: `10000`) |
+| `--file <path>` | Read URLs from file (one per line, `#` comments) |
+| `--badge <path>` | Generate SVG status badge |
+| `--watch <secs>` | Re-check every N seconds |
 | `--help` | Show help |
 | `--version` | Show version |
 
@@ -49,37 +156,21 @@ x402-check [options] <url> [url...]
 ### Examples
 
 ```bash
-# Check a single URL
-x402-check https://api.example.com/resource
-
-# Verbose: schema validation + facilitator reachability
-x402-check --verbose https://api.example.com/resource
-
-# JSON output (pipe-friendly, great for CI)
-x402-check --json https://api.example.com/resource | jq .
-
-# Check multiple URLs at once
+# Check multiple URLs
 x402-check https://api.a.com/paid https://api.b.com/endpoint
 
-# Use in CI — exits 0 if x402 found, 1 if not
-x402-check https://api.example.com/resource && echo "x402 detected!"
+# Read URLs from file
+echo "https://pay.skillpacks.dev/api/skills/security-suite" > urls.txt
+x402-check --file urls.txt
 
-# Custom timeout
-x402-check --timeout 5000 https://slow.example.com/api
-```
+# Generate a badge
+x402-check --badge badge.svg https://api.example.com/resource
 
-### Output (colored)
+# Watch mode — re-check every 60 seconds
+x402-check --watch 60 https://api.example.com/resource
 
-```
-✅ x402 DETECTED  https://api.example.com/resource
-  Status:      402
-  Network:     base-mainnet
-  Scheme:      exact
-  Amount:      1000000
-  Resource:    https://api.example.com/resource
-  Pay to:      0xDeadBeef...
-  Schema:      ✅ Valid
-  Facilitator: ✅ Reachable (HTTP 200)
+# CI — exits 0 if x402 found
+x402-check https://api.example.com/resource && echo "x402 active!"
 ```
 
 ---
@@ -97,13 +188,11 @@ import {
 
 ### `checkX402(url, options?)`
 
-Check if a URL supports x402. Returns an `X402Result`.
-
 ```typescript
 const result = await checkX402('https://api.example.com/resource', {
-  timeout: 10000,        // ms (default: 10000)
-  verbose: true,         // include headers in result (default: false)
-  checkFacilitator: true // probe facilitator URL (default: same as verbose)
+  timeout: 10000,
+  verbose: true,
+  checkFacilitator: true,
 });
 
 if (result.supported) {
@@ -113,17 +202,9 @@ if (result.supported) {
 }
 ```
 
-**Returns:** [`X402Result`](#x402result)
-
----
-
 ### `validateSchema(payload)`
 
-Validate a decoded `PaymentRequired` payload against the x402 v1 spec.
-
 ```typescript
-import { validateSchema } from 'x402-check';
-
 const validation = validateSchema({
   x402Version: 1,
   accepts: [{
@@ -141,67 +222,213 @@ const validation = validateSchema({
 
 console.log(validation.valid);    // true
 console.log(validation.errors);   // []
-console.log(validation.warnings); // []
 ```
-
-**Required fields:**
-- `x402Version` — number (should be `1`)
-- `accepts` — non-empty array of payment options
-  - Each entry: `scheme`, `network`, `maxAmountRequired`, `resource`, `description`, `mimeType`, `payTo`
-- `facilitatorUrl` — valid `http(s)://` URL
-
-**Returns:** [`ValidationResult`](#validationresult)
-
----
 
 ### `checkFacilitator(url, timeout?)`
 
-Probe a facilitator URL with a HEAD request.
-
 ```typescript
-import { checkFacilitator } from 'x402-check';
-
 const fc = await checkFacilitator('https://facilitator.example.com', 5000);
-if (fc.reachable) {
-  console.log(`Facilitator up! HTTP ${fc.status}`);
-} else {
-  console.warn('Facilitator unreachable:', fc.error ?? `HTTP ${fc.status}`);
-}
+// fc.reachable: true if 2xx/3xx
 ```
-
-HTTP 2xx/3xx = reachable. 4xx/5xx/timeout = not reachable (warn).
-
-**Returns:** [`FacilitatorResult`](#facilitatorresult)
 
 ---
 
-### `decodePaymentRequired(headerValue)`
+## GitHub Action
 
-Decode the raw base64 `x-payment-required` header value.
+Zero-dependency composite action for CI/CD pipelines.
 
-```typescript
-import { decodePaymentRequired } from 'x402-check';
+```yaml
+- name: Verify x402 endpoint
+  uses: suryast/x402-check@master
+  with:
+    urls: |
+      https://pay.skillpacks.dev/api/skills/security-suite
+      https://a2alist.ai/api/submit
+    fail-on-missing: 'true'
+    timeout: '15000'
+```
 
-const raw = response.headers.get('x-payment-required');
-if (raw) {
-  const details = decodePaymentRequired(raw); // throws on invalid input
+### Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `urls` | ✅ | — | Newline-separated URLs to check |
+| `fail-on-missing` | ❌ | `false` | Fail the step if any URL lacks x402 |
+| `timeout` | ❌ | `10000` | Request timeout in ms |
+
+### Outputs
+
+| Output | Description |
+|--------|-------------|
+| `results` | JSON array of check results |
+| `found-count` | Number of URLs with x402 |
+| `total-count` | Total URLs checked |
+
+### Workflow Examples
+
+```yaml
+# Scheduled monitoring
+name: x402 Monitor
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: suryast/x402-check@master
+        with:
+          urls: https://pay.skillpacks.dev/api/skills/security-suite
+          fail-on-missing: 'true'
+
+# PR gate — ensure x402 stays active
+name: x402 Gate
+on: [pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: suryast/x402-check@master
+        id: x402
+        with:
+          urls: https://your-api.com/paid-endpoint
+          fail-on-missing: 'true'
+      - run: echo "Found ${{ steps.x402.outputs.found-count }} x402 endpoints"
+```
+
+---
+
+## Chrome Extension
+
+MV3 Chrome extension that passively detects x402 endpoints while you browse.
+
+### Features
+
+- 🟢 Green **x402** badge when x402 detected on current site
+- 🔴 Red **OFF** badge when no x402 found
+- Auto-discovers via `/.well-known/x402.json`
+- Stores discovered x402 sites locally
+- One-click submit to [a2alist.ai](https://a2alist.ai) directory
+- Export discovered sites as JSON
+- Built-in directory browser (powered by a2alist.ai)
+
+### Install
+
+1. Download or clone `extension/` directory
+2. Open `chrome://extensions`
+3. Enable **Developer mode**
+4. Click **Load unpacked** → select `extension/`
+
+### How It Works
+
+```mermaid
+flowchart TD
+    A[Page loads] --> B[Service worker triggers]
+    B --> C{Direct probe<br/>GET returns 402?}
+    C -->|Yes| D[Parse x-payment-required]
+    C -->|No| E{Probe /.well-known/x402.json}
+    E -->|Found| F[Parse discovery doc]
+    E -->|Not found| G["🔴 Badge: OFF"]
+    D --> H["🟢 Badge: x402"]
+    F --> H
+    H --> I[Store in chrome.storage]
+    I --> J[Show notification]
+    
+    K[User clicks popup] --> L{x402 detected?}
+    L -->|Yes| M[Show payment details<br/>+ Submit to a2alist.ai]
+    L -->|No| N[Show empty state<br/>+ Browse directory]
+```
+
+### Privacy
+
+- No data sent automatically — submission is user-initiated only
+- Discovered sites stored locally in `chrome.storage.local`
+- Extension only makes HEAD/GET probes to detect x402 headers
+
+---
+
+## Hosted API
+
+Cloudflare Worker providing a public x402 checking API with rate limiting and badge generation.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/check?url=<url>` | Check single URL |
+| `POST` | `/check/batch` | Check multiple URLs (max 10) |
+| `GET` | `/badge/<domain>.svg` | Status badge for README/docs |
+
+### Examples
+
+```bash
+# Single check
+curl "https://x402-check.yoursite.workers.dev/check?url=https://pay.skillpacks.dev/api/skills/security-suite"
+
+# Batch check
+curl -X POST "https://x402-check.yoursite.workers.dev/check/batch" \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://api.a.com/paid", "https://api.b.com/paid"]}'
+
+# Embed badge in your README
+![x402 status](https://x402-check.yoursite.workers.dev/badge/pay.skillpacks.dev.svg)
+```
+
+### Rate Limits
+
+- **100 requests/minute** per IP (KV-backed)
+- Batch endpoint counts as 1 request
+- Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+
+### Deploy
+
+```bash
+cd worker
+wrangler kv:namespace create RATE_LIMIT_KV
+# Update wrangler.toml with the KV namespace ID
+wrangler deploy
+```
+
+---
+
+## x402 Discovery Standard
+
+This project introduces `/.well-known/x402.json` as a discovery mechanism for x402-enabled sites. Sites that use x402 on specific endpoints (not the homepage) can advertise their x402 support:
+
+```json
+{
+  "x402Version": 1,
+  "endpoints": [
+    {
+      "path": "/api/submit",
+      "method": "POST",
+      "description": "Paid API endpoint",
+      "price": "$0.99 USDC",
+      "network": "eip155:8453"
+    }
+  ]
 }
 ```
+
+This enables passive detection by browser extensions and crawlers without probing every route.
 
 ---
 
 ## Types
+
+<details>
+<summary>TypeScript interfaces</summary>
 
 ### `X402Result`
 
 ```typescript
 interface X402Result {
   url: string;
-  supported: boolean;         // true if HTTP 402 + valid payment header
-  status: number;             // HTTP status code (0 = network error)
+  supported: boolean;
+  status: number;
   paymentDetails?: PaymentRequired;
-  rawHeader?: string;         // raw base64 header value
-  headers?: Record<string, string>; // all response headers (verbose mode)
+  rawHeader?: string;
+  headers?: Record<string, string>;
   error?: string;
   schemaValidation?: ValidationResult;
   facilitatorCheck?: FacilitatorResult;
@@ -213,8 +440,8 @@ interface X402Result {
 ```typescript
 interface ValidationResult {
   valid: boolean;
-  errors: string[];    // spec violations (hard failures)
-  warnings: string[];  // soft issues (e.g. resource not a URL)
+  errors: string[];
+  warnings: string[];
 }
 ```
 
@@ -236,35 +463,22 @@ interface PaymentRequired {
   x402Version?: number;
   accepts?: AcceptsEntry[];
   facilitatorUrl?: string;
-  // legacy flat fields also supported
   scheme?: string;
   network?: string;
   maxAmountRequired?: string;
-  // ...
 }
 ```
 
----
-
-## CI/CD Integration
-
-```yaml
-# GitHub Actions example
-- name: Check x402 endpoint
-  run: npx x402-check https://api.example.com/resource
-  # Exits 0 = detected, 1 = not found, 2 = error
-```
+</details>
 
 ---
 
-## x402 Protocol
+## Related
 
-x402 is an open HTTP payment standard pioneered by Coinbase. When a server returns HTTP 402 with an `x-payment-required` header, clients can decode the payment requirements, send a payment, and retry with a receipt.
-
-Learn more:
-- [x402.org](https://x402.org)
-- [coinbase/x402 on GitHub](https://github.com/coinbase/x402)
-- [a2alist.ai — x402 site directory](https://a2alist.ai)
+- [x402.org](https://x402.org) — x402 protocol spec
+- [coinbase/x402](https://github.com/coinbase/x402) — Reference implementation
+- [a2alist.ai](https://a2alist.ai) — x402 & A2A agent directory
+- [skillpacks.dev](https://skillpacks.dev) — AI skills marketplace (x402-powered)
 
 ---
 
