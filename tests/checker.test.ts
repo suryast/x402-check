@@ -153,12 +153,12 @@ describe('validateSchema', () => {
     expect(result.errors.some((e) => e.includes('payTo'))).toBe(true);
   });
 
-  it('fails when facilitatorUrl is missing', () => {
+  it('warns when facilitatorUrl is missing', () => {
     const payload = makeSpecPayload();
     delete (payload as Record<string, unknown>).facilitatorUrl;
     const result = validateSchema(payload);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.includes('facilitatorUrl'))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((w) => w.includes('facilitatorUrl'))).toBe(true);
   });
 
   it('fails when facilitatorUrl is not a valid URL', () => {
@@ -172,6 +172,25 @@ describe('validateSchema', () => {
     expect(validateSchema(null).valid).toBe(false);
     expect(validateSchema('string').valid).toBe(false);
     expect(validateSchema(42).valid).toBe(false);
+  });
+
+  it('validates discovery documents with endpoints array', () => {
+    const payload = {
+      x402Version: 1,
+      endpoints: [
+        { path: '/api/submit', method: 'POST', description: 'Paid endpoint' },
+      ],
+    };
+    const result = validateSchema(payload);
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('fails discovery document with empty endpoints', () => {
+    const payload = { x402Version: 1, endpoints: [] };
+    const result = validateSchema(payload);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes('endpoints'))).toBe(true);
   });
 
   it('warns when accepts[].resource is not a URL', () => {
