@@ -71,7 +71,8 @@ function formatPayment(result: X402Result, verbose: boolean): void {
   const { url, status, supported, paymentDetails, error, headers, schemaValidation, facilitatorCheck } = result;
 
   if (supported && paymentDetails) {
-    console.log(`\n${chalk.bold.green('✅ x402 DETECTED')} ${chalk.gray(url)}`);
+    const source = status === 402 ? '' : chalk.cyan(' (via .well-known/x402.json)');
+    console.log(`\n${chalk.bold.green('✅ x402 DETECTED')}${source} ${chalk.gray(url)}`);
     console.log(`  ${chalk.bold('Status:')}      ${chalk.yellow(String(status))}`);
 
     // New spec: shows accepts array

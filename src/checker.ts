@@ -85,6 +85,46 @@ export async function checkFacilitator(
   }
 }
 
+/**
+ * Probe /.well-known/x402.json on the origin of the given URL.
+ * Returns the parsed payload or null if not found / invalid.
+ */
+async function probeWellKnown(
+  url: string,
+  timeout: number
+): Promise<PaymentRequired | null> {
+  try {
+    const origin = new URL(url).origin;
+    const wellKnownUrl = `${origin}/.well-known/x402.json`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    const response = await fetch(wellKnownUrl, {
+      method: 'GET',
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'x402-validate/1.1.1 (https://github.com/suryast/x402-check)',
+      },
+    });
+    clearTimeout(timer);
+
+    if (response.status !== 200) return null;
+
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.includes('json')) return null;
+
+    const body = (await response.json()) as Record<string, unknown>;
+
+    // Must have x402Version or endpoints to be valid
+    if (!body.x402Version && !body.endpoints) return null;
+
+    return body as unknown as PaymentRequired;
+  } catch {
+    return null;
+  }
+}
+
 export async function checkX402(url: string, options: CheckOptions = {}): Promise<X402Result> {
   const { timeout = 10000, verbose = false, checkFacilitator: doFacilitator } = options;
   // Run facilitator check when explicitly requested or when verbose
@@ -164,6 +204,30 @@ export async function checkX402(url: string, options: CheckOptions = {}): Promis
         supported: false,
         status: 402,
         error: 'HTTP 402 but no x402 payment header found',
+        ...(verbose ? { headers: headersObj } : {}),
+      };
+    }
+
+    // No 402 — try /.well-known/x402.json discovery
+    const wellKnown = await probeWellKnown(url, Math.min(timeout, 5000));
+    if (wellKnown) {
+      const schemaValidation = validateSchema(wellKnown as unknown);
+
+      let facilitatorCheck: FacilitatorResult | undefined;
+      if (shouldCheckFacilitator && wellKnown.facilitatorUrl) {
+        facilitatorCheck = await checkFacilitator(
+          wellKnown.facilitatorUrl,
+          Math.min(timeout, 5000)
+        );
+      }
+
+      return {
+        url,
+        supported: true,
+        status: response.status,
+        paymentDetails: wellKnown,
+        schemaValidation,
+        ...(facilitatorCheck ? { facilitatorCheck } : {}),
         ...(verbose ? { headers: headersObj } : {}),
       };
     }
