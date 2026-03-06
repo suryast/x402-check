@@ -277,13 +277,34 @@ export async function checkUrl(url: string): Promise<X402Result> {
       response.headers.get(PAYMENT_HEADER) || response.headers.get(PAYMENT_HEADER_ALT);
 
     if (!rawHeader) {
+      // Try parsing JSON body — many x402 implementations (e.g. x402-hono)
+      // put payment details in the response body instead of headers
+      try {
+        const contentType = response.headers.get('content-type') ?? '';
+        if (contentType.includes('json')) {
+          const body = (await response.json()) as Record<string, unknown>;
+          if (body.x402Version || body.accepts) {
+            // Body-based x402 detected — extract payment info
+            const accepts = body.accepts as Record<string, unknown>[] | undefined;
+            const firstAccept = accepts?.[0];
+            const paymentInfo = firstAccept
+              ? (firstAccept as unknown as PaymentRequired)
+              : (body as unknown as PaymentRequired);
+            const facilitator = await probeFacilitator(paymentInfo);
+            return { url, x402: true, paymentInfo, facilitator, checkedAt };
+          }
+        }
+      } catch {
+        // Body parsing failed — fall through
+      }
+
       return {
         url,
         x402: false,
         paymentInfo: null,
         facilitator: null,
         checkedAt,
-        error: 'HTTP 402 but no x402 payment header found',
+        error: 'HTTP 402 but no x402 payment header or body found',
       };
     }
 

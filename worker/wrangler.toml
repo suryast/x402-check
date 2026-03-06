@@ -9,8 +9,8 @@ RATE_LIMIT_PER_DAY = "100"
 
 [[kv_namespaces]]
 binding = "RATE_LIMITS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+id = "b7476415792e4e0a9bbc007bd61dda5b"
+preview_id = "0b7cf9cedacb44109e37b0d9bc2db05a"
 
 [dev]
 port = 8787
