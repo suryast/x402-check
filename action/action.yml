@@ -1,0 +1,32 @@
+name: 'x402-check'
+description: 'Check if URLs support the x402 HTTP payment protocol'
+author: 'a2alist.ai'
+
+branding:
+  icon: 'check-circle'
+  color: 'green'
+
+inputs:
+  urls:
+    description: 'Newline-separated list of URLs to check for x402 support'
+    required: true
+  fail-on-missing:
+    description: 'Fail the step if no URL has x402 support (set to "false" to disable)'
+    required: false
+    default: 'true'
+  timeout:
+    description: 'Request timeout in milliseconds'
+    required: false
+    default: '10000'
+
+outputs:
+  results:
+    description: 'JSON array of check results, one object per URL'
+  found-count:
+    description: 'Number of URLs where x402 support was detected'
+  total-count:
+    description: 'Total number of URLs checked'
+
+runs:
+  using: 'node20'
+  main: 'index.js'

@@ -1,0 +1,17 @@
+name = "x402-check-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+MAX_BATCH_SIZE = "10"
+RATE_LIMIT_PER_DAY = "100"
+
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_ID"
+
+[dev]
+port = 8787
+local_protocol = "http"

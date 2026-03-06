@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>x402 Detector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      width: 380px;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 13px 16px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #2a2a2a;
+      flex-shrink: 0;
+    }
+    .logo {
+      width: 28px; height: 28px;
+      background: #22c55e;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 10px; color: #000;
+      letter-spacing: -0.5px; flex-shrink: 0;
+    }
+    .header h1 { font-size: 14px; font-weight: 600; color: #fff; }
+    .header .version { font-size: 11px; color: #555; margin-left: auto; }
+
+    /* ── Tabs ────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      background: #141414;
+      border-bottom: 1px solid #2a2a2a;
+      flex-shrink: 0;
+    }
+    .tab {
+      flex: 1; padding: 9px 4px;
+      background: none; border: none;
+      border-bottom: 2px solid transparent;
+      color: #666; font-size: 11px; font-weight: 500;
+      cursor: pointer; transition: color 0.15s;
+      white-space: nowrap;
+    }
+    .tab.active { color: #22c55e; border-bottom-color: #22c55e; }
+    .tab-content { display: none; }
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    /* ── Status section ──────────────────────────────── */
+    .status-section {
+      padding: 14px 16px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; margin-bottom: 8px;
+    }
+    .status-badge.detected {
+      background: rgba(34,197,94,.15); color: #22c55e;
+      border: 1px solid rgba(34,197,94,.3);
+    }
+    .status-badge.not-detected {
+      background: rgba(107,114,128,.15); color: #9ca3af;
+      border: 1px solid rgba(107,114,128,.3);
+    }
+    .status-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+    .status-badge.detected .dot { background: #22c55e; }
+    .status-badge.not-detected .dot { background: #6b7280; }
+    .url-display { font-size: 11px; color: #777; word-break: break-all; line-height: 1.4; }
+
+    /* ── Empty state (non-x402 page) ─────────────────── */
+    .empty-state-page {
+      padding: 20px 16px 16px;
+      text-align: center;
+    }
+    .empty-icon { font-size: 28px; margin-bottom: 8px; }
+    .empty-state-page p {
+      color: #888; font-size: 12px; line-height: 1.6; margin-bottom: 14px;
+    }
+    .btn-a2alist-hero {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: #000; font-weight: 700; font-size: 12px;
+      padding: 9px 16px; border-radius: 8px;
+      border: none; cursor: pointer; text-decoration: none;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn-a2alist-hero:hover { opacity: .9; }
+    .btn-a2alist-hero:active { transform: scale(.98); }
+
+    /* ── Details grid ────────────────────────────────── */
+    .details { padding: 12px 16px; border-bottom: 1px solid #2a2a2a; }
+    .detail-grid { display: grid; grid-template-columns: 88px 1fr; gap: 5px 10px; }
+    .detail-label {
+      color: #555; font-size: 10px; padding-top: 2px;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .detail-value {
+      color: #e5e5e5; font-size: 12px;
+      font-family: 'SF Mono','Monaco','Cascadia Code',monospace;
+      word-break: break-all;
+    }
+    .detail-value.highlight { color: #22c55e; font-weight: 600; }
+    .detail-value a { color: #60a5fa; text-decoration: none; }
+    .detail-value a:hover { text-decoration: underline; }
+
+    /* ── Action buttons ──────────────────────────────── */
+    .actions {
+      padding: 12px 16px;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    button, .btn-link-full {
+      width: 100%; padding: 9px 14px; border-radius: 7px;
+      border: none; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: opacity .15s, transform .1s;
+      text-align: center; text-decoration: none; display: block;
+    }
+    button:hover, .btn-link-full:hover { opacity: .9; }
+    button:active, .btn-link-full:active { transform: scale(.98); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-submit { background: #22c55e; color: #000; }
+    .btn-secondary { background: #1f1f1f; color: #e5e5e5; border: 1px solid #2e2e2e; }
+    .btn-a2alist { background: #171717; color: #22c55e; border: 1px solid rgba(34,197,94,.3); }
+
+    /* ── Discoveries list (tab 2) ────────────────────── */
+    .list-header {
+      padding: 11px 16px 7px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .list-header-count { font-size: 11px; color: #555; }
+    .discoveries-list { overflow-y: auto; max-height: 230px; flex: 1; }
+    .disc-item {
+      padding: 9px 16px; border-bottom: 1px solid #1a1a1a; cursor: default;
+    }
+    .disc-item:hover { background: #161616; }
+    .disc-url { font-size: 11px; color: #e5e5e5; word-break: break-all; margin-bottom: 2px; }
+    .disc-meta { font-size: 10px; color: #555; }
+    .disc-meta .net { color: #22c55e; font-weight: 600; }
+
+    /* ── Directory tab (tab 3) ────────────────────────── */
+    .dir-header {
+      padding: 12px 16px 8px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .dir-title { font-size: 12px; font-weight: 600; color: #e5e5e5; }
+    .dir-link { font-size: 11px; color: #22c55e; text-decoration: none; cursor: pointer; }
+    .dir-link:hover { text-decoration: underline; }
+    .dir-list { overflow-y: auto; max-height: 250px; flex: 1; }
+    .dir-item {
+      padding: 10px 16px; border-bottom: 1px solid #1a1a1a;
+      cursor: pointer; transition: background .1s;
+    }
+    .dir-item:hover { background: #161616; }
+    .dir-item-name { font-size: 12px; font-weight: 600; color: #e5e5e5; margin-bottom: 2px; }
+    .dir-item-desc { font-size: 11px; color: #666; line-height: 1.4; margin-bottom: 4px; }
+    .dir-item-meta { display: flex; gap: 8px; align-items: center; }
+    .dir-pill {
+      font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 600;
+    }
+    .dir-pill.net { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.2); }
+    .dir-pill.cat { background: rgba(96,165,250,.1); color: #60a5fa; border: 1px solid rgba(96,165,250,.2); }
+    .dir-item-url { font-size: 10px; color: #444; margin-left: auto; }
+    .dir-cta {
+      padding: 12px 16px;
+      border-top: 1px solid #2a2a2a;
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ──────────────────────────────────────── */
+    .footer {
+      padding: 9px 16px;
+      background: #141414;
+      border-top: 1px solid #1e1e1e;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .footer a {
+      font-size: 11px; color: #22c55e;
+      text-decoration: none; cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .footer a:hover { text-decoration: underline; }
+    .footer-count {
+      background: rgba(34,197,94,.15); color: #22c55e;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px;
+      border: 1px solid rgba(34,197,94,.25);
+    }
+
+    /* ── Loading / Toast ─────────────────────────────── */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      padding: 28px; color: #555; font-size: 12px; gap: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #222; border-top-color: #22c55e;
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    .empty-list {
+      padding: 28px 16px; text-align: center; color: #555; font-size: 12px; line-height: 1.6;
+    }
+    .toast {
+      position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+      background: #22c55e; color: #000;
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 12px; font-weight: 700;
+      opacity: 0; transition: opacity .2s;
+      pointer-events: none; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">x402</div>
+    <h1>x402 Detector</h1>
+    <span class="version">v1.0.0</span>
+  </div>
+
+  <!-- Tabs: Current Page | Discovered | Directory -->
+  <div class="tabs">
+    <button class="tab active" data-tab="current">Current Page</button>
+    <button class="tab" data-tab="discovered">Found (<span id="disc-count">0</span>)</button>
+    <button class="tab" data-tab="directory">Directory ✦</button>
+  </div>
+
+  <!-- ── Tab: Current Page ─────────────────────────── -->
+  <div class="tab-content active" id="tab-current">
+    <div id="loading" class="loading">
+      <div class="spinner"></div> Checking…
+    </div>
+
+    <div id="content" style="display:none">
+      <!-- Status -->
+      <div class="status-section">
+        <div class="status-badge" id="status-badge">
+          <span class="dot"></span>
+          <span id="status-text">Not detected</span>
+        </div>
+        <div class="url-display" id="current-url">—</div>
+      </div>
+
+      <!-- Non-x402 empty state -->
+      <div id="empty-page-state" class="empty-state-page" style="display:none">
+        <div class="empty-icon">🔍</div>
+        <p>This site doesn't support x402 yet.<br>
+           Discover x402-enabled AI agents and APIs<br>on the curated directory.</p>
+        <a class="btn-a2alist-hero" id="btn-empty-a2alist" href="#">
+          Browse x402 agents on a2alist.ai →
+        </a>
+      </div>
+
+      <!-- x402 details -->
+      <div class="details" id="details-section" style="display:none">
+        <div class="detail-grid" id="detail-grid"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions" id="actions-section">
+        <button class="btn-submit" id="btn-submit" disabled>Submit to a2alist.ai</button>
+        <button class="btn-secondary" id="btn-probe">Re-probe this URL</button>
+        <a class="btn-link-full btn-a2alist" id="btn-browse-dir" href="#" style="display:none">
+          Browse similar x402 agents on a2alist.ai →
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Discovered ──────────────────────────── -->
+  <div class="tab-content" id="tab-discovered">
+    <div class="list-header">
+      <span class="list-header-count" id="disc-header-count">0 sites discovered</span>
+      <button class="btn-secondary" id="btn-export"
+              style="width:auto;padding:4px 10px;font-size:11px">Export JSON</button>
+    </div>
+    <div class="discoveries-list" id="discoveries-list">
+      <div class="empty-list">
+        No x402 sites discovered yet.<br>Browse the web and they'll appear here.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tab: Directory ───────────────────────────── -->
+  <div class="tab-content" id="tab-directory">
+    <div class="dir-header">
+      <span class="dir-title">x402 Agent Directory</span>
+      <a class="dir-link" id="dir-view-all" href="#">View all on a2alist.ai →</a>
+    </div>
+    <div class="dir-list" id="dir-list">
+      <div class="loading" id="dir-loading">
+        <div class="spinner"></div> Loading directory…
+      </div>
+    </div>
+    <div class="dir-cta">
+      <button class="btn-a2alist" id="btn-dir-open">
+        Browse 61+ agents on a2alist.ai →
+      </button>
+    </div>
+  </div>
+
+  <!-- Footer (always visible) -->
+  <div class="footer">
+    <a id="footer-a2alist" href="#">
+      <span class="footer-count">61+</span>
+      x402 agents on a2alist.ai →
+    </a>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
