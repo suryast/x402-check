@@ -47,17 +47,18 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!tab.url) return;
   if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
 
+  // Set red immediately, flip to green if x402 found
+  await updateBadge(tabId, false);
   try {
     const result = await probeForX402(tab.url);
     tabCache[tabId] = result;
-    await updateBadge(tabId, result !== null);
     if (result) {
+      await updateBadge(tabId, true);
       await storeDiscovery(result);
       await maybeNotify(result);
     }
   } catch (_) {
     tabCache[tabId] = null;
-    await updateBadge(tabId, false);
   }
 });
 
