@@ -198,12 +198,44 @@ export async function checkX402(url: string, options: CheckOptions = {}): Promis
         }
       }
 
-      // 402 but no recognised payment header
+      // 402 but no recognised payment header — try parsing JSON body
+      // Many x402 implementations (e.g. x402-hono) put payment details in the response body
+      try {
+        const contentType = response.headers.get('content-type') ?? '';
+        if (contentType.includes('json')) {
+          const body = (await response.json()) as Record<string, unknown>;
+          if (body.x402Version || body.accepts) {
+            const paymentDetails = body as unknown as PaymentRequired;
+            const schemaValidation = validateSchema(paymentDetails as unknown);
+
+            let facilitatorCheck: FacilitatorResult | undefined;
+            if (shouldCheckFacilitator && paymentDetails.facilitatorUrl) {
+              facilitatorCheck = await checkFacilitator(
+                paymentDetails.facilitatorUrl,
+                Math.min(timeout, 5000)
+              );
+            }
+
+            return {
+              url,
+              supported: true,
+              status: 402,
+              paymentDetails,
+              schemaValidation,
+              ...(facilitatorCheck ? { facilitatorCheck } : {}),
+              ...(verbose ? { headers: headersObj } : {}),
+            };
+          }
+        }
+      } catch {
+        // Body parsing failed — fall through to unsupported
+      }
+
       return {
         url,
         supported: false,
         status: 402,
-        error: 'HTTP 402 but no x402 payment header found',
+        error: 'HTTP 402 but no x402 payment header or body found',
         ...(verbose ? { headers: headersObj } : {}),
       };
     }

@@ -43,7 +43,8 @@ function encodeHeader(obj: object): string {
   return Buffer.from(JSON.stringify(obj)).toString('base64');
 }
 
-function mockFetch(status: number, headers: Record<string, string> = {}, body = '') {
+function mockFetch(status: number, headers: Record<string, string> = {}, body: string | object = '') {
+  const bodyStr = typeof body === 'object' ? JSON.stringify(body) : body;
   return vi.fn().mockResolvedValue({
     status,
     headers: {
@@ -52,7 +53,8 @@ function mockFetch(status: number, headers: Record<string, string> = {}, body = 
         for (const [k, v] of Object.entries(headers)) cb(v, k);
       },
     },
-    text: async () => body,
+    text: async () => bodyStr,
+    json: async () => typeof body === 'object' ? body : JSON.parse(bodyStr),
   });
 }
 
@@ -380,12 +382,41 @@ describe('checkX402', () => {
     expect(result.error).toBeTruthy();
   });
 
-  it('handles 402 with no payment header gracefully', async () => {
+  it('handles 402 with no payment header and no body gracefully', async () => {
     globalThis.fetch = mockFetch(402) as unknown as typeof fetch;
     const result = await checkX402('https://example.com/legacy-402');
     expect(result.supported).toBe(false);
     expect(result.status).toBe(402);
-    expect(result.error).toMatch(/no x402 payment header/i);
+    expect(result.error).toMatch(/no x402 payment header or body/i);
+  });
+
+  it('detects x402 from JSON response body when no header present', async () => {
+    const bodyPayload = {
+      error: 'X-PAYMENT header is required',
+      accepts: [
+        {
+          scheme: 'exact',
+          network: 'base',
+          maxAmountRequired: '990000',
+          resource: 'https://pay.example.com/api/skill',
+          payTo: '0xb92AAb592cBeD6a12a6e17DdF65e96050c268BC8',
+          maxTimeoutSeconds: 300,
+          asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        },
+      ],
+      x402Version: 1,
+    };
+    globalThis.fetch = mockFetch(
+      402,
+      { 'content-type': 'application/json' },
+      bodyPayload
+    ) as unknown as typeof fetch;
+    const result = await checkX402('https://pay.example.com/api/skill');
+    expect(result.supported).toBe(true);
+    expect(result.status).toBe(402);
+    expect(result.paymentDetails).toBeDefined();
+    expect(result.paymentDetails?.x402Version).toBe(1);
+    expect(result.paymentDetails?.accepts).toHaveLength(1);
   });
 
   it('handles malformed payment header gracefully', async () => {
