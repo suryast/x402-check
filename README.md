@@ -1,8 +1,14 @@
 # x402-validate
 
-[![npm version](https://img.shields.io/npm/v/x402-validate.svg)](https://www.npmjs.com/package/x402-validate)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
+<p align="center">
+  <img src="docs/images/icon.png" alt="x402 Detector" width="96" />
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/x402-validate"><img src="https://img.shields.io/npm/v/x402-validate.svg" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js >= 18" /></a>
+</p>
 
 **CLI + library + GitHub Action + Chrome Extension + hosted API** to validate [x402 HTTP payment protocol](https://x402.org) endpoints.
 
@@ -311,6 +317,12 @@ MV3 Chrome extension that passively detects x402 endpoints while you browse.
 - One-click submit to [a2alist.ai](https://a2alist.ai) directory
 - Export discovered sites as JSON
 - Built-in directory browser (powered by a2alist.ai)
+
+### Screenshots
+
+| x402 Detected | Not Found |
+|:-:|:-:|
+| ![x402 detected](docs/images/screenshot-detected.png) | ![not found](docs/images/screenshot-not-found.png) |
 
 ### Install
 
