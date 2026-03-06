@@ -4,10 +4,10 @@ import chalk from 'chalk';
 
 function printHelp() {
   console.log(`
-${chalk.bold.cyan('x402-check')} — Check if URLs support the x402 payment protocol
+${chalk.bold.cyan('x402-validate')} — Check if URLs support the x402 payment protocol
 
 ${chalk.bold('USAGE')}
-  x402-check [options] <url> [url...]
+  x402-validate [options] <url> [url...]
 
 ${chalk.bold('OPTIONS')}
   --json          Machine-readable JSON output
@@ -22,11 +22,11 @@ ${chalk.bold('EXIT CODES')}
   2   Error (network, timeout, invalid args)
 
 ${chalk.bold('EXAMPLES')}
-  x402-check https://api.example.com/resource
-  x402-check --json https://api.example.com/resource
-  x402-check --timeout 5000 https://api.example.com/resource
-  x402-check --verbose https://api.example.com/resource
-  x402-check https://a.com/api https://b.com/api
+  x402-validate https://api.example.com/resource
+  x402-validate --json https://api.example.com/resource
+  x402-validate --timeout 5000 https://api.example.com/resource
+  x402-validate --verbose https://api.example.com/resource
+  x402-validate https://a.com/api https://b.com/api
 
 ${chalk.gray('Learn more: https://x402.org | https://a2alist.ai')}
 `);

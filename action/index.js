@@ -1,5 +1,5 @@
 /**
- * x402-check GitHub Action
+ * x402-validate GitHub Action
  * Self-contained: uses only Node.js built-ins. No npm install needed.
  * Compatible with node20 runner.
  */
@@ -70,7 +70,7 @@ function checkUrl(url, timeout) {
 
     let req;
     try {
-      req = mod.request(url, { method: 'GET', headers: { 'User-Agent': 'x402-check-action/1.0.0' } }, (res) => { // #8
+      req = mod.request(url, { method: 'GET', headers: { 'User-Agent': 'x402-validate-action/1.0.0' } }, (res) => { // #8
         const status = res.statusCode || 0;
         const paymentHeader = res.headers['x-payment-required'];
 

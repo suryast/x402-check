@@ -1,6 +1,6 @@
-# x402-check
+# x402-validate
 
-[![npm version](https://img.shields.io/npm/v/x402-check.svg)](https://www.npmjs.com/package/x402-check)
+[![npm version](https://img.shields.io/npm/v/x402-validate.svg)](https://www.npmjs.com/package/x402-validate)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Node.js >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 
@@ -14,8 +14,8 @@ Detects x402-enabled endpoints, decodes `PaymentRequired` payloads, validates sc
 
 ```mermaid
 graph TB
-    subgraph "x402-check Ecosystem"
-        CLI["🖥️ CLI<br/>x402-check &lt;url&gt;"]
+    subgraph "x402-validate Ecosystem"
+        CLI["🖥️ CLI<br/>x402-validate &lt;url&gt;"]
         LIB["📦 npm Library<br/>import { checkX402 }"]
         ACTION["⚙️ GitHub Action<br/>CI/CD pipeline"]
         EXT["🔌 Chrome Extension<br/>Browser detection"]
@@ -55,7 +55,7 @@ sequenceDiagram
     C->>S: GET /api/resource
     S-->>C: 402 Payment Required<br/>x-payment-required: {accepts, facilitatorUrl}
     
-    Note over C: x402-check detects this! ✅
+    Note over C: x402-validate detects this! ✅
     
     C->>F: POST /verify<br/>{payment proof}
     F->>B: Verify on-chain
@@ -100,16 +100,16 @@ flowchart LR
 
 ```bash
 # Install globally
-npm install -g x402-check
+npm install -g x402-validate
 
 # Check a URL
-x402-check https://pay.skillpacks.dev/api/skills/security-suite
+x402-validate https://pay.skillpacks.dev/api/skills/security-suite
 
 # Verbose: schema validation + facilitator check
-x402-check --verbose https://pay.skillpacks.dev/api/skills/security-suite
+x402-validate --verbose https://pay.skillpacks.dev/api/skills/security-suite
 
 # JSON output for CI
-x402-check --json https://api.example.com/resource | jq .
+x402-validate --json https://api.example.com/resource | jq .
 ```
 
 ### Output
@@ -131,7 +131,7 @@ x402-check --json https://api.example.com/resource | jq .
 ## CLI Reference
 
 ```bash
-x402-check [options] <url> [url...]
+x402-validate [options] <url> [url...]
 ```
 
 | Flag | Description |
@@ -157,20 +157,20 @@ x402-check [options] <url> [url...]
 
 ```bash
 # Check multiple URLs
-x402-check https://api.a.com/paid https://api.b.com/endpoint
+x402-validate https://api.a.com/paid https://api.b.com/endpoint
 
 # Read URLs from file
 echo "https://pay.skillpacks.dev/api/skills/security-suite" > urls.txt
-x402-check --file urls.txt
+x402-validate --file urls.txt
 
 # Generate a badge
-x402-check --badge badge.svg https://api.example.com/resource
+x402-validate --badge badge.svg https://api.example.com/resource
 
 # Watch mode — re-check every 60 seconds
-x402-check --watch 60 https://api.example.com/resource
+x402-validate --watch 60 https://api.example.com/resource
 
 # CI — exits 0 if x402 found
-x402-check https://api.example.com/resource && echo "x402 active!"
+x402-validate https://api.example.com/resource && echo "x402 active!"
 ```
 
 ---
@@ -183,7 +183,7 @@ import {
   validateSchema,
   checkFacilitator,
   decodePaymentRequired,
-} from 'x402-check';
+} from 'x402-validate';
 ```
 
 ### `checkX402(url, options?)`
@@ -239,7 +239,7 @@ Zero-dependency composite action for CI/CD pipelines.
 
 ```yaml
 - name: Verify x402 endpoint
-  uses: suryast/x402-check@master
+  uses: suryast/x402-validate@master
   with:
     urls: |
       https://pay.skillpacks.dev/api/skills/security-suite
@@ -276,7 +276,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: suryast/x402-check@master
+      - uses: suryast/x402-validate@master
         with:
           urls: https://pay.skillpacks.dev/api/skills/security-suite
           fail-on-missing: 'true'
@@ -288,7 +288,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: suryast/x402-check@master
+      - uses: suryast/x402-validate@master
         id: x402
         with:
           urls: https://your-api.com/paid-endpoint
@@ -363,15 +363,15 @@ Cloudflare Worker providing a public x402 checking API with rate limiting and ba
 
 ```bash
 # Single check
-curl "https://x402-check.yoursite.workers.dev/check?url=https://pay.skillpacks.dev/api/skills/security-suite"
+curl "https://x402-validate.yoursite.workers.dev/check?url=https://pay.skillpacks.dev/api/skills/security-suite"
 
 # Batch check
-curl -X POST "https://x402-check.yoursite.workers.dev/check/batch" \
+curl -X POST "https://x402-validate.yoursite.workers.dev/check/batch" \
   -H "Content-Type: application/json" \
   -d '{"urls": ["https://api.a.com/paid", "https://api.b.com/paid"]}'
 
 # Embed badge in your README
-![x402 status](https://x402-check.yoursite.workers.dev/badge/pay.skillpacks.dev.svg)
+![x402 status](https://x402-validate.yoursite.workers.dev/badge/pay.skillpacks.dev.svg)
 ```
 
 ### Rate Limits
