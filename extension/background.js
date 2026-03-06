@@ -164,7 +164,8 @@ async function updateBadge(tabId, detected) {
     await chrome.action.setBadgeBackgroundColor({ tabId, color: '#22c55e' });
     await chrome.action.setTitle({ tabId, title: 'x402 detected — click for details' });
   } else {
-    await chrome.action.setBadgeText({ tabId, text: '' });
+    await chrome.action.setBadgeText({ tabId, text: '—' });
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: '#ef4444' });
     await chrome.action.setTitle({ tabId, title: 'x402 Detector — no x402 on this page' });
   }
 }
