@@ -61,5 +61,9 @@
   "homepage": "https://github.com/a2alist/x402-check#readme",
   "bugs": {
     "url": "https://github.com/a2alist/x402-check/issues"
+  },
+  "funding": {
+    "type": "ko-fi",
+    "url": "https://ko-fi.com/srvzt"
   }
 }
