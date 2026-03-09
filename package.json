@@ -1,6 +1,6 @@
 {
   "name": "x402-validate",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "CLI + library to check if URLs support the x402 HTTP payment protocol. Validates schema, checks facilitator reachability, and outputs colored results.",
   "keywords": [
     "x402",
@@ -56,11 +56,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/a2alist/x402-check"
+    "url": "https://github.com/suryast/x402-check"
   },
-  "homepage": "https://github.com/a2alist/x402-check#readme",
+  "homepage": "https://github.com/suryast/x402-check#readme",
   "bugs": {
-    "url": "https://github.com/a2alist/x402-check/issues"
+    "url": "https://github.com/suryast/x402-check/issues"
   },
   "funding": {
     "type": "ko-fi",

@@ -67,7 +67,7 @@ export async function checkFacilitator(
       signal: controller.signal,
       redirect: 'follow',
       headers: {
-        'User-Agent': 'x402-validate/1.1.0 (https://github.com/a2alist/x402-validate)',
+        'User-Agent': 'x402-validate/1.1.0 (https://github.com/suryast/x402-check)',
       },
     });
     clearTimeout(timer);
@@ -142,7 +142,7 @@ export async function checkX402(url: string, options: CheckOptions = {}): Promis
       signal: controller.signal,
       redirect: 'follow',
       headers: {
-        'User-Agent': 'x402-validate/1.1.0 (https://github.com/a2alist/x402-validate)',
+        'User-Agent': 'x402-validate/1.1.0 (https://github.com/suryast/x402-check)',
       },
     });
 
