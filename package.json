@@ -1,7 +1,7 @@
 {
   "name": "x402-validate",
-  "version": "1.2.0",
-  "description": "CLI + library + Chrome Extension to check if URLs support the x402 HTTP payment protocol. Validates schema, checks facilitator reachability, and outputs colored results.",
+  "version": "1.1.9",
+  "description": "CLI + library to check if URLs support the x402 HTTP payment protocol. Validates schema, checks facilitator reachability, and outputs colored results.",
   "keywords": [
     "x402",
     "payment",
@@ -12,9 +12,7 @@
     "cli",
     "validator",
     "blockchain",
-    "web3",
-    "chrome-extension",
-    "browser-extension"
+    "web3"
   ],
   "author": "a2alist.ai",
   "license": "MIT",

@@ -6,7 +6,6 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/x402-validate"><img src="https://img.shields.io/npm/v/x402-validate.svg" alt="npm version" /></a>
-  <a href="https://chromewebstore.google.com/detail/x402-detector/mjaefmlaacmjgfpigilkmnfpjfcckohc"><img src="https://img.shields.io/chrome-web-store/v/mjaefmlaacmjgfpigilkmnfpjfcckohc.svg" alt="Chrome Web Store" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js >= 18" /></a>
 </p>
@@ -327,14 +326,6 @@ MV3 Chrome extension that passively detects x402 endpoints while you browse.
 | ![x402 detected](docs/images/screenshot-detected.png) | ![not found](docs/images/screenshot-not-found.png) |
 
 ### Install
-
-**From Chrome Web Store (recommended):**
-
-[![Install from Chrome Web Store](https://img.shields.io/chrome-web-store/v/mjaefmlaacmjgfpigilkmnfpjfcckohc.svg)](https://chromewebstore.google.com/detail/x402-detector/mjaefmlaacmjgfpigilkmnfpjfcckohc)
-
-👉 **[Install x402 Detector](https://chromewebstore.google.com/detail/x402-detector/mjaefmlaacmjgfpigilkmnfpjfcckohc)**
-
-**From source (development):**
 
 1. Download or clone `extension/` directory
 2. Open `chrome://extensions`
