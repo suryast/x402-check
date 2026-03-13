@@ -8,6 +8,7 @@
   <a href="https://www.npmjs.com/package/x402-validate"><img src="https://img.shields.io/npm/v/x402-validate.svg" alt="npm version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="Node.js >= 18" /></a>
+  <a href="https://chromewebstore.google.com/detail/x402-detector/mjaefmlaacmjgfpigilkmnfpjfcckohc"><img src="https://img.shields.io/badge/Chrome_Web_Store-x402_Detector-4285F4?logo=googlechrome&logoColor=white" alt="Chrome Web Store" /></a>
 </p>
 
 **CLI + library + GitHub Action + Chrome Extension** to validate [x402 HTTP payment protocol](https://x402.org) endpoints.
@@ -326,6 +327,12 @@ MV3 Chrome extension that passively detects x402 endpoints while you browse.
 | ![x402 detected](docs/images/screenshot-detected.png) | ![not found](docs/images/screenshot-not-found.png) |
 
 ### Install
+
+**From Chrome Web Store (recommended):**
+
+[![Install from Chrome Web Store](https://img.shields.io/badge/Install-Chrome_Web_Store-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/x402-detector/mjaefmlaacmjgfpigilkmnfpjfcckohc)
+
+**Manual (developer mode):**
 
 1. Download or clone `extension/` directory
 2. Open `chrome://extensions`
