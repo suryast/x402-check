@@ -47,7 +47,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsup": "^8.0.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.4.0",
     "vitest": "^4.0.18"
   },
@@ -65,5 +65,8 @@
   "funding": {
     "type": "ko-fi",
     "url": "https://ko-fi.com/srvzt"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
   }
 }
