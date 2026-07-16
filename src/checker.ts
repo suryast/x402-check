@@ -6,8 +6,8 @@ import type {
 } from './types.js';
 import { validateSchema } from './validator.js';
 
-const PAYMENT_HEADER = 'x-payment-required';
-const PAYMENT_HEADER_ALT = 'payment-required';
+const PAYMENT_HEADER = 'payment-required';
+const PAYMENT_HEADER_ALT = 'x-payment-required';
 
 export function decodePaymentRequired(header: string): PaymentRequired {
   const decoded = Buffer.from(header, 'base64').toString('utf-8');

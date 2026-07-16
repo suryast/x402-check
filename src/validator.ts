@@ -3,11 +3,14 @@ import type { PaymentRequired, AcceptsEntry, ValidationResult } from './types.js
 const REQUIRED_ACCEPTS_FIELDS: Array<keyof AcceptsEntry> = [
   'scheme',
   'network',
+  'payTo',
+];
+
+const V1_ACCEPTS_FIELDS: Array<keyof AcceptsEntry> = [
   'maxAmountRequired',
   'resource',
   'description',
   'mimeType',
-  'payTo',
 ];
 
 function isValidUrl(value: unknown): boolean {
@@ -93,6 +96,15 @@ export function validateSchema(payload: unknown): ValidationResult {
           return;
         }
         const e = entry as Record<string, unknown>;
+        // v2 spec uses 'amount' (string, wei); v1 uses 'maxAmountRequired'
+        const hasAmount = 'amount' in e && e['amount'] !== undefined && e['amount'] !== null && e['amount'] !== '';
+        const hasMaxAmount = 'maxAmountRequired' in e && e['maxAmountRequired'] !== undefined && e['maxAmountRequired'] !== null && e['maxAmountRequired'] !== '';
+        if (!hasAmount && !hasMaxAmount) {
+          errors.push(`accepts[${idx}] must have either 'amount' (v2) or 'maxAmountRequired' (v1) field`);
+        }
+        if (hasAmount && typeof e['amount'] !== 'string') {
+          errors.push(`accepts[${idx}].amount must be a string`);
+        }
         for (const field of REQUIRED_ACCEPTS_FIELDS) {
           if (!(field in e) || e[field] === undefined || e[field] === null || e[field] === '') {
             errors.push(`accepts[${idx}].${field} is required`);
@@ -101,6 +113,12 @@ export function validateSchema(payload: unknown): ValidationResult {
             typeof e[field] !== 'string'
           ) {
             errors.push(`accepts[${idx}].${field} must be a string`);
+          }
+        }
+        // v1 fields are soft-required (warning only)
+        for (const field of V1_ACCEPTS_FIELDS) {
+          if (!(field in e) || e[field] === undefined || e[field] === null || e[field] === '') {
+            warnings.push(`accepts[${idx}].${field} is missing (required for v1, optional for v2)`);
           }
         }
         if ('maxTimeoutSeconds' in e && e.maxTimeoutSeconds !== undefined) {
