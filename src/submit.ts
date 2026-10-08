@@ -204,9 +204,13 @@ export function buildSubmissionPayload(
     paymentInfo: {
       network: firstAccept?.network ?? paymentInfo.network ?? '',
       scheme: firstAccept?.scheme ?? paymentInfo.scheme ?? '',
-      maxAmountRequired: firstAccept?.maxAmountRequired ?? paymentInfo.maxAmountRequired ?? '',
-      resource: firstAccept?.resource ?? paymentInfo.resource ?? url,
-      description: firstAccept?.description ?? paymentInfo.description ?? null,
+      maxAmountRequired: paymentInfo.x402Version === 2 && typeof firstAccept?.amount === 'string'
+        ? firstAccept.amount : typeof firstAccept?.maxAmountRequired === 'string'
+          ? firstAccept.maxAmountRequired : paymentInfo.maxAmountRequired ?? '',
+      resource: typeof paymentInfo.resource === 'object' ? paymentInfo.resource.url
+        : typeof firstAccept?.resource === 'string' ? firstAccept.resource : paymentInfo.resource ?? url,
+      description: typeof paymentInfo.resource === 'object' ? paymentInfo.resource.description ?? null
+        : typeof firstAccept?.description === 'string' ? firstAccept.description : paymentInfo.description ?? null,
       payTo: legacyPayTo.map((p) => ({
         address: p.address,
         amount: p.amount,

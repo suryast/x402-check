@@ -14,12 +14,30 @@ export interface AcceptsEntry {
   [key: string]: unknown;
 }
 
-/** Full x402 PaymentRequired payload (spec-compliant v1 structure) */
+/** v2 resource metadata, separate from the payment requirements. */
+export interface ResourceInfo {
+  url: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface AcceptsEntryV2 {
+  scheme: string;
+  network: string;
+  amount: string;
+  asset: string;
+  payTo: string;
+  maxTimeoutSeconds: number;
+  extra?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** Decoded v1/v2 challenge, or a legacy flat/discovery document. */
 export interface PaymentRequired {
-  /** x402 spec version (should be 1) */
+  /** Supported x402 wire versions: 1 (legacy), 2 */
   x402Version?: number;
   /** Payment options the server accepts */
-  accepts?: AcceptsEntry[];
+  accepts?: (AcceptsEntry | AcceptsEntryV2)[];
   /** Facilitator service URL for payment processing */
   facilitatorUrl?: string;
 
@@ -27,7 +45,7 @@ export interface PaymentRequired {
   scheme?: string;
   network?: string;
   maxAmountRequired?: string;
-  resource?: string;
+  resource?: string | ResourceInfo;
   description?: string;
   mimeType?: string;
   outputSchema?: unknown;

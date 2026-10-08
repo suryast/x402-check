@@ -9,78 +9,7 @@ const SUBMIT_ENDPOINT   = 'https://a2alist.ai/api/submit';
 
 // Curated fallback list shown when the API is unreachable.
 // Hand-picked from a2alist.ai to give users an immediate sense of the directory.
-const FALLBACK_AGENTS = [
-  {
-    name: 'Claude API (Anthropic)',
-    description: 'Frontier AI assistant with x402 metered access.',
-    url: 'https://api.anthropic.com',
-    network: 'base',
-    category: 'ai-assistant',
-  },
-  {
-    name: 'GPT-4 Pay-per-call',
-    description: 'OpenAI models with per-request crypto billing.',
-    url: 'https://api.openai.com',
-    network: 'base',
-    category: 'ai-assistant',
-  },
-  {
-    name: 'Stability AI Image API',
-    description: 'Text-to-image generation, pay per image.',
-    url: 'https://api.stability.ai',
-    network: 'base',
-    category: 'image-gen',
-  },
-  {
-    name: 'DeepSeek Coder',
-    description: 'Code completion & generation, micro-payments per request.',
-    url: 'https://api.deepseek.com',
-    network: 'base',
-    category: 'code',
-  },
-  {
-    name: 'Perplexity Search',
-    description: 'AI-powered search with x402 access control.',
-    url: 'https://api.perplexity.ai',
-    network: 'base',
-    category: 'search',
-  },
-  {
-    name: 'ElevenLabs TTS',
-    description: 'High-quality text-to-speech, pay per character.',
-    url: 'https://api.elevenlabs.io',
-    network: 'base',
-    category: 'audio',
-  },
-  {
-    name: 'Replicate Model API',
-    description: 'Run open-source ML models on demand.',
-    url: 'https://api.replicate.com',
-    network: 'base',
-    category: 'ml-platform',
-  },
-  {
-    name: 'Weather Data Pro',
-    description: 'Hyper-local weather forecasts via x402.',
-    url: 'https://weatherapi.example',
-    network: 'ethereum',
-    category: 'data',
-  },
-  {
-    name: 'CryptoSentiment AI',
-    description: 'Real-time crypto market sentiment analysis.',
-    url: 'https://sentiment.example',
-    network: 'base',
-    category: 'finance',
-  },
-  {
-    name: 'PDF Extractor Agent',
-    description: 'Structured data extraction from PDFs, pay per page.',
-    url: 'https://pdfagent.example',
-    network: 'base',
-    category: 'data',
-  },
-];
+const FALLBACK_AGENTS = [];
 
 // ---------------------------------------------------------------------------
 // DOM refs
@@ -156,6 +85,8 @@ async function init() {
 // Current-page tab rendering
 // ---------------------------------------------------------------------------
 function showContent(url, x402Info) {
+  document.body.dataset.state = x402Info ? 'detected' : 'not-detected';
+  document.querySelector('.logo img').src = x402Info ? 'icons/icon32-active.png' : 'icons/icon32.png';
   loadingEl.style.display  = 'none';
   contentEl.style.display  = 'block';
   currentX402 = x402Info;
@@ -174,7 +105,7 @@ function showContent(url, x402Info) {
   } else {
     // No x402 on this page
     statusBadge.className      = 'status-badge not-detected';
-    statusText.textContent     = 'No x402 on this page';
+    statusText.textContent     = 'No valid x402 observed';
     detailsSection.style.display = 'none';
     emptyPageState.style.display = 'block';
     btnBrowseDir.style.display   = 'none';
@@ -183,47 +114,10 @@ function showContent(url, x402Info) {
 }
 
 function showDetails(info) {
-  const rows = [];
-
-  if (info.network && info.network !== 'unknown')
-    rows.push(['Network', `<span class="highlight">${esc(info.network)}</span>`]);
-  if (info.scheme)
-    rows.push(['Scheme', esc(info.scheme)]);
-  if (info.amount && info.amount !== 'unknown')
-    rows.push(['Amount', `<span class="highlight">${esc(info.amount)}</span>`]);
-  if (info.resource && info.resource !== info.url)
-    rows.push(['Resource', esc(truncateUrl(info.resource))]);
-  if (info.description)
-    rows.push(['Description', esc(info.description)]);
-  if (info.payTo?.length)
-    rows.push(['Pay to', `<span title="${esc(info.payTo[0].address)}">${esc(truncMid(info.payTo[0].address, 20))}</span>`]);
-
-  // #2: Validate facilitator URL is https:// before rendering as a link (XSS prevention)
-  const facilitator = info.raw?.extra?.facilitator || info.raw?.facilitatorUrl;
-  if (facilitator) {
-    const fStr = String(facilitator);
-    if (fStr.startsWith('https://')) {
-      // Render as a clickable span; use chrome.tabs.create onclick (no raw href)
-      rows.push(['Facilitator', `<span class="facilitator-link" data-url="${esc(fStr)}" style="cursor:pointer;color:#22c55e;text-decoration:underline">${esc(truncateUrl(fStr))}</span>`]);
-    } else {
-      // Non-https: render as plain text only
-      rows.push(['Facilitator', esc(truncateUrl(fStr))]);
-    }
-  }
-
-  rows.push(['Detected', relTime(info.detectedAt)]);
-
-  detailGrid.innerHTML = rows.map(([l, v]) =>
-    `<span class="detail-label">${l}</span><span class="detail-value">${v}</span>`
-  ).join('');
-
-  // #2: Open facilitator links safely via chrome.tabs.create (no raw anchor href)
-  detailGrid.querySelectorAll('.facilitator-link').forEach((el) => {
-    el.addEventListener('click', () => {
-      const u = el.dataset.url;
-      if (u) chrome.tabs.create({ url: u });
-    });
-  });
+ detailGrid.replaceChildren();
+ for(const [label,value] of [['Protocol',`v${info.version}${info.version===1?' (legacy)':''}`],['Network',info.network],['Scheme',info.scheme],['Amount',`${info.amount} atomic units`],['Asset',info.asset],['Pay to',info.payTo],['Resource',info.resource],['Evidence','Unsigned requirements only; not verified settlement']]) {
+ const l=document.createElement('span');l.className='detail-label';l.textContent=label;const v=document.createElement('span');v.className='detail-value';v.textContent=String(value||'—');detailGrid.append(l,v);
+ }
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +130,7 @@ async function loadDirectory() {
   try {
     const ctrl = new AbortController();
     setTimeout(() => ctrl.abort(), 4000);
-    const resp = await fetch(A2ALIST_AGENTS_API, { signal: ctrl.signal });
+    const resp = await fetch(A2ALIST_AGENTS_API, { signal: ctrl.signal, credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' });
     if (resp.ok) agents = await resp.json();
   } catch {
     // fall through to hardcoded list
@@ -245,7 +139,7 @@ async function loadDirectory() {
   // Normalise: API might return {agents:[…]} or a plain array
   if (agents && !Array.isArray(agents)) agents = agents.agents || agents.data || null;
 
-  const list = (agents && agents.length) ? agents.slice(0, 10) : FALLBACK_AGENTS;
+  const list = Array.isArray(agents) ? agents.filter(a => a && typeof a.name === 'string' && X402Protocol.safeUrl(a.url || a.website)).slice(0, 10) : FALLBACK_AGENTS;
 
   dirLoading.style.display = 'none';
 
@@ -265,9 +159,9 @@ async function loadDirectory() {
   dirList.querySelectorAll('.dir-item').forEach((el) => {
     el.addEventListener('click', () => {
       const url = el.dataset.url;
-      if (url && url !== '#') chrome.runtime.sendMessage({ type: 'OPEN_A2ALIST', path: '' });
+
       // For real agent URLs (not hardcoded placeholders), open directly
-      if (url && url.startsWith('http') && !url.includes('.example')) {
+      if (X402Protocol.safeUrl(url)) {
         chrome.tabs.create({ url });
       } else {
         chrome.runtime.sendMessage({ type: 'OPEN_A2ALIST', path: '' });
@@ -316,11 +210,11 @@ async function loadDiscoveries() {
 // Event listeners
 // ---------------------------------------------------------------------------
 btnProbe.addEventListener('click', async () => {
-  if (!currentUrl) return;
+  if (!currentUrl || !confirm('Send one unauthenticated GET to this URL? Cookies are omitted and redirects refused.')) return;
   btnProbe.disabled   = true;
   btnProbe.textContent = 'Probing…';
   try {
-    const resp = await chrome.runtime.sendMessage({ type: 'PROBE_URL', url: currentUrl });
+    const resp = await chrome.runtime.sendMessage({ type: 'PROBE_URL', url: currentUrl, tabId: currentTabId });
     showContent(currentUrl, resp?.result || null);
     showToast(resp?.result ? '✓ x402 confirmed' : 'No x402 found');
   } catch { showToast('Probe failed'); }
@@ -332,9 +226,10 @@ btnProbe.addEventListener('click', async () => {
 
 btnSubmit.addEventListener('click', async () => {
   if (!currentX402 || !currentUrl) return;
+  if (!confirm('Open a directory submission form with the redacted URL and network? Nothing is submitted automatically.')) return;
   const info = currentX402;
   const params = new URLSearchParams({
-    url: currentUrl,
+    url: info.url,
     name: new URL(currentUrl).hostname,
     description: info.description || `x402-enabled service on ${new URL(currentUrl).hostname}`,
     protocol: 'x402',
@@ -372,23 +267,6 @@ btnExport.addEventListener('click', async () => {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function buildPayload(url, info) {
-  return {
-    url,
-    submittedAt: new Date().toISOString(),
-    source: 'x402-extension',
-    paymentInfo: {
-      network: info.network,
-      scheme:  info.scheme,
-      maxAmountRequired: info.amount,
-      resource: info.resource,
-      description: info.description || null,
-      payTo: info.payTo || [],
-    },
-    raw: info.raw || null,
-  };
-}
-
 function truncateUrl(url) {
   if (!url) return '';
   try {

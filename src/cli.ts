@@ -81,7 +81,10 @@ function formatPayment(result: X402Result, verbose: boolean): void {
         const prefix = paymentDetails.accepts.length > 1 ? ` [${i + 1}]` : '';
         console.log(`  ${chalk.bold(`Network${prefix}:`)}   ${entry.network}`);
         console.log(`  ${chalk.bold(`Scheme${prefix}:`)}    ${entry.scheme}`);
-        console.log(`  ${chalk.bold(`Amount${prefix}:`)}    ${entry.maxAmountRequired}`);
+        console.log(`  ${chalk.bold(`Amount${prefix}:`)}    ${paymentDetails.x402Version === 2 ? entry.amount : entry.maxAmountRequired}`);
+        if (paymentDetails.x402Version === 2 && typeof paymentDetails.resource === 'object') {
+          console.log(`  ${chalk.bold(`Resource${prefix}:`)}  ${paymentDetails.resource.url}`);
+        }
         if (entry.resource) {
           console.log(`  ${chalk.bold(`Resource${prefix}:`)}  ${entry.resource}`);
         }

@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="20" fill="#22c55e"/>
-  <text x="64" y="72" font-family="Arial Black, Arial, sans-serif" font-weight="900"
-        font-size="44" fill="#000000" text-anchor="middle" dominant-baseline="middle">x402</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"><title>x402 Detector — no valid requirements observed; not safety certification</title><rect x="4" y="4" width="120" height="120" rx="26" fill="#151a18" stroke="#8b9690" stroke-width="4"/><path d="M28 36 L65 92 M65 36 L28 92" fill="none" stroke="#eafff1" stroke-width="12" stroke-linecap="round"/><circle cx="96" cy="43" r="13" fill="#ff6470" stroke="#ff6470" stroke-width="3"/><circle cx="96" cy="85" r="13" fill="#151a18" stroke="#59665e" stroke-width="3"/></svg>

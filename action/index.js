@@ -1,7 +1,7 @@
 /**
  * x402-validate GitHub Action
  * Self-contained: uses only Node.js built-ins. No npm install needed.
- * Compatible with node20 runner.
+ * Uses the Node.js 24 GitHub Actions runtime.
  */
 
 'use strict';
@@ -17,7 +17,7 @@ const fs = require('fs');
  * GitHub Actions maps `inputs.<name>` → INPUT_<NAME> env var.
  */
 function getInput(name, required) {
-  const envKey = `INPUT_${name.toUpperCase().replace(/-/g, '_')}`;
+  const envKey = `INPUT_${name.toUpperCase().replace(/ /g, '_')}`;
   const val = (process.env[envKey] || '').trim();
   if (required && !val) {
     setFailed(`Input required and not supplied: ${name}`);
@@ -48,6 +48,36 @@ function setFailed(msg) {
   process.exit(1);
 }
 
+// Standalone structural validation; does not verify signatures or settlement.
+function validatePayment(payment) {
+  const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const text = value => typeof value === 'string' && value.trim() !== '';
+  const httpUrl = value => {
+    if (typeof value !== 'string') return false;
+    try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; }
+  };
+  if (!record(payment) || ![1, 2].includes(payment.x402Version)) return false;
+  if (!Array.isArray(payment.accepts) || payment.accepts.length === 0) return false;
+  if ('facilitatorUrl' in payment && !httpUrl(payment.facilitatorUrl)) return false;
+  if (payment.x402Version === 2) {
+    if (!record(payment.resource) || !httpUrl(payment.resource.url)) return false;
+    for (const field of ['description', 'mimeType']) {
+      if (field in payment.resource && typeof payment.resource[field] !== 'string') return false;
+    }
+    if ('error' in payment && typeof payment.error !== 'string') return false;
+    if ('extensions' in payment && (!record(payment.extensions) || Object.values(payment.extensions).some(e => !record(e) || !record(e.info) || !record(e.schema)))) return false;
+    return payment.accepts.every(e => record(e)
+      && ['scheme', 'network', 'amount', 'asset', 'payTo'].every(field => text(e[field]))
+      && /^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$/.test(e.network)
+      && /^\d+$/.test(e.amount)
+      && Number.isSafeInteger(e.maxTimeoutSeconds) && e.maxTimeoutSeconds > 0
+      && (!('extra' in e) || record(e.extra)));
+  }
+  return payment.accepts.every(e => record(e)
+    && ['scheme', 'network', 'maxAmountRequired', 'resource', 'description', 'mimeType', 'payTo'].every(field => typeof e[field] === 'string' && e[field] !== '')
+    && (!('maxTimeoutSeconds' in e) || e.maxTimeoutSeconds === undefined || typeof e.maxTimeoutSeconds === 'number'));
+}
+
 // ─── x402 checker (inline, zero external deps) ───────────────────────────────
 
 /**
@@ -72,12 +102,13 @@ function checkUrl(url, timeout) {
     try {
       req = mod.request(url, { method: 'GET', headers: { 'User-Agent': 'x402-validate-action/1.0.0' } }, (res) => { // #8
         const status = res.statusCode || 0;
-        const paymentHeader = res.headers['x-payment-required'];
+        const paymentHeader = res.headers['payment-required'] !== undefined ? res.headers['payment-required'] : res.headers['x-payment-required'];
 
         if (status === 402 && paymentHeader) {
           try {
             const decoded = Buffer.from(paymentHeader, 'base64').toString('utf-8');
             const payment = JSON.parse(decoded);
+            if (!validatePayment(payment)) throw new Error('Invalid x402 v1/v2 payment requirements');
             done({ url, supported: true, status, payment });
           } catch (e) {
             done({ url, supported: false, status, error: 'Failed to decode payment header: ' + e.message });
@@ -170,9 +201,11 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  setFailed(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    setFailed(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+  });
+}
 
 // Export helpers for testing
 if (typeof module !== 'undefined') {
