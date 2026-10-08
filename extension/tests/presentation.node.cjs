@@ -1,0 +1,4 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const base=path.join(__dirname,'..');
+test('manifest toolbar and package icons include real PNG sizes',()=>{const m=JSON.parse(fs.readFileSync(path.join(base,'manifest.json')));for(const n of [16,32,48,128]){assert.equal(m.action.default_icon[n],m.icons[n]);const b=fs.readFileSync(path.join(base,m.icons[n]));assert.equal(b.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(b.readUInt32BE(16),n);assert.equal(b.readUInt32BE(20),n);}});
+test('popup uses actual icon, bounded motion and full reduced-motion override',()=>{const h=fs.readFileSync(path.join(base,'popup.html'),'utf8');assert.match(h,/src="icons\/icon32.png"/);assert.match(h,/prefers-reduced-motion: reduce/);assert.match(h,/animation: none !important; transition: none !important/);assert.match(h,/animation: spin .7s linear 4/);assert.match(h,/focus-visible/);});

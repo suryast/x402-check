@@ -156,8 +156,8 @@ export async function checkX402(url: string, options: CheckOptions = {}): Promis
     // x402 detection: HTTP 402 + payment header
     if (response.status === 402) {
       const rawHeader =
-        response.headers.get(PAYMENT_HEADER) ||
         response.headers.get(PAYMENT_HEADER_ALT) ||
+        response.headers.get(PAYMENT_HEADER) ||
         null;
 
       if (rawHeader) {

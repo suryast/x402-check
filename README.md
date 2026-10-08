@@ -1,7 +1,7 @@
 # x402-validate
 
 <p align="center">
-  <img src="docs/images/icon.png" alt="x402 Detector" width="96" />
+  <img src="extension/icons/icon128.png" alt="x402 Detector" width="96" />
 </p>
 
 <p align="center">
@@ -13,7 +13,9 @@
 
 **CLI + library + GitHub Action + Chrome Extension** to validate [x402 HTTP payment protocol](https://x402.org) endpoints.
 
-Detects x402-enabled endpoints via **headers and JSON body**, decodes `PaymentRequired` payloads, validates schema compliance, checks facilitator reachability, generates status badges, and monitors endpoints in watch mode.
+Detects x402 v2 and legacy v1 payment challenges, decodes `PaymentRequired` payloads, and reports structural validation. The CLI/library also support JSON bodies, optional facilitator reachability checks, status badges, and watch mode.
+
+A detected challenge is unsigned server-provided metadata, not proof of merchant identity, payment authorization, or settlement. This tool does not sign payments or send payment authorizations. A reachable facilitator is not proof that a payment can be verified or settled.
 
 ---
 
@@ -41,9 +43,11 @@ graph TB
     CLI -->|probe| SITE
     LIB -->|probe| SITE
     ACTION -->|probe| SITE
-    EXT -->|probe| SITE
-    EXT -->|discover| WELL
-    EXT -->|submit listing| A2A
+    CLI -->|discovery fallback| WELL
+    LIB -->|discovery fallback| WELL
+    EXT -->|observe response headers| SITE
+    EXT -->|user-confirmed GET probe| SITE
+    EXT -->|open sanitized submission form| A2A
 ```
 
 ## How x402 Works
@@ -56,38 +60,33 @@ sequenceDiagram
     participant B as Blockchain
 
     C->>S: GET /api/resource
-    S-->>C: 402 Payment Required<br/>x-payment-required: {accepts, facilitatorUrl}
-    
-    Note over C: x402-validate detects this! ✅
-    
-    C->>F: POST /verify<br/>{payment proof}
-    F->>B: Verify on-chain
-    B-->>F: Confirmed ✅
-    F-->>C: Payment receipt
-    C->>S: GET /api/resource<br/>X-Payment: {receipt}
-    S-->>C: 200 OK + content
+    S-->>C: 402 + PAYMENT-REQUIRED (base64 PaymentRequired)
+    Note over C,S: x402-validate detects the unsigned challenge here
+    C->>S: Retry with PAYMENT-SIGNATURE (signed PaymentPayload)
+    S->>F: POST /verify (authorization + requirements)
+    F-->>S: Verification result
+    S->>F: POST /settle (authorization + requirements)
+    F->>B: Submit settlement
+    B-->>F: Settlement result
+    F-->>S: SettlementResponse
+    S-->>C: Content + PAYMENT-RESPONSE (settlement result)
 ```
+
+`PAYMENT-REQUIRED` takes precedence over legacy `X-PAYMENT-REQUIRED`. Legacy v1 uses `X-PAYMENT` for authorization and `X-PAYMENT-RESPONSE` for the settlement response.
 
 ## Detection Flow
 
 ```mermaid
 flowchart LR
-    A[Visit URL] --> B{GET returns 402?}
-    B -->|Yes| C{x-payment-required header?}
-    C -->|Yes| C2[Decode header]
-    C -->|No| C3{JSON body has x402Version/accepts?}
-    C3 -->|Yes| C4[Parse body payload]
-    C3 -->|No| F[🔴 No x402]
-    B -->|No| D{/.well-known/x402.json exists?}
-    D -->|Yes| E[Parse discovery document]
-    D -->|No| F
-    C2 --> G[Validate schema]
-    C4 --> G
+    A[Explicit CLI/library URL check] --> B{HTTP 402?}
+    B -->|Yes| C{PAYMENT-REQUIRED or legacy X-PAYMENT-REQUIRED?}
+    C -->|Yes| D[Decode selected header]
+    C -->|No| E[Try JSON response body]
+    B -->|No| F[CLI/library discovery fallback]
+    D --> G[Report structural validation]
     E --> G
-    G --> H{Valid?}
-    H -->|Yes| I[Check facilitator reachability]
-    H -->|No| J[⚠️ Invalid schema]
-    I --> K[🟢 x402 Detected]
+    F --> G
+    G --> H[Optional facilitator reachability check]
 ```
 
 ---
@@ -121,6 +120,8 @@ x402-validate --json https://api.example.com/resource | jq .
 ```
 
 ### Output
+
+Illustrative output only; these values are not a current availability or payment-settlement check.
 
 ```
 ✅ x402 DETECTED  https://pay.skillpacks.dev/api/skills/security-suite
@@ -213,21 +214,25 @@ if (result.supported) {
 ### `validateSchema(payload)`
 
 ```typescript
+// Unsigned challenge adapted from the official v2 specification example.
 const validation = validateSchema({
-  x402Version: 1,
+  x402Version: 2,
+  resource: {
+    url: 'https://api.example.com/premium-data',
+    description: 'Access to premium market data',
+    mimeType: 'application/json',
+  },
   accepts: [{
     scheme: 'exact',
-    network: 'base-mainnet',
-    maxAmountRequired: '1000000',
-    resource: 'https://example.com/api',
-    description: 'Access to AI API',
-    mimeType: 'application/json',
-    payTo: '0xDeadBeef',
-    maxTimeoutSeconds: 300,
+    network: 'eip155:84532',
+    amount: '10000',
+    asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    payTo: '0x209693Bc6afc0C5328bA36FaF03C514EF312287C',
+    maxTimeoutSeconds: 60,
+    extra: { name: 'USDC', version: '2' },
   }],
-  facilitatorUrl: 'https://facilitator.example.com',
+  extensions: {},
 });
-
 console.log(validation.valid);    // true
 console.log(validation.errors);   // []
 ```
@@ -243,11 +248,13 @@ const fc = await checkFacilitator('https://facilitator.example.com', 5000);
 
 ## GitHub Action
 
-Zero-dependency composite action for CI/CD pipelines.
+Zero-dependency JavaScript action using the GitHub Actions Node.js 24 runtime. It checks HTTP 402 headers only (v2 `PAYMENT-REQUIRED`, then legacy v1 `X-PAYMENT-REQUIRED`) and rejects malformed challenge schemas. Unlike the CLI/library, it does not parse JSON bodies, follow redirects, probe discovery documents, or check facilitators. Its `payment` result field contains the decoded challenge; the library calls this field `paymentDetails`.
+
+The action lives in `action/`, so include that subdirectory in `uses`. Pin a reviewed commit SHA for production workflows; the examples below use the development branch, not a published 1.2.0 release.
 
 ```yaml
 - name: Verify x402 endpoint
-  uses: suryast/x402-validate@master
+  uses: suryast/x402-check/action@master
   with:
     urls: |
       https://pay.skillpacks.dev/api/skills/security-suite
@@ -261,7 +268,7 @@ Zero-dependency composite action for CI/CD pipelines.
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `urls` | ✅ | — | Newline-separated URLs to check |
-| `fail-on-missing` | ❌ | `false` | Fail the step if any URL lacks x402 |
+| `fail-on-missing` | ❌ | `true` | Fail if no checked URL has a valid x402 challenge |
 | `timeout` | ❌ | `10000` | Request timeout in ms |
 
 ### Outputs
@@ -284,7 +291,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: suryast/x402-validate@master
+      - uses: suryast/x402-check/action@master
         with:
           urls: https://pay.skillpacks.dev/api/skills/security-suite
           fail-on-missing: 'true'
@@ -296,7 +303,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: suryast/x402-validate@master
+      - uses: suryast/x402-check/action@master
         id: x402
         with:
           urls: https://your-api.com/paid-endpoint
@@ -314,9 +321,10 @@ MV3 Chrome extension that passively detects x402 endpoints while you browse.
 
 - 🟢 Green **x402** badge when x402 detected on current site
 - 🔴 Red **OFF** badge when no x402 found
-- Auto-discovers via `/.well-known/x402.json`
+- Observes response headers without replaying requests or probing discovery paths automatically
+- Offers an explicit, user-confirmed GET probe
 - Stores discovered x402 sites locally
-- One-click submit to [a2alist.ai](https://a2alist.ai) directory
+- Opens a sanitized [a2alist.ai](https://a2alist.ai) submission form for user review
 - Export discovered sites as JSON
 - Built-in directory browser (powered by a2alist.ai)
 
@@ -343,35 +351,28 @@ MV3 Chrome extension that passively detects x402 endpoints while you browse.
 
 ```mermaid
 flowchart TD
-    A[Page loads] --> B[Service worker triggers]
-    B --> C{Direct probe<br/>GET returns 402?}
-    C -->|Yes| D[Parse x-payment-required]
-    C -->|No| E{Probe /.well-known/x402.json}
-    E -->|Found| F[Parse discovery doc]
-    E -->|Not found| G["🔴 Badge: OFF"]
-    D --> H["🟢 Badge: x402"]
-    F --> H
-    H --> I[Store in chrome.storage]
-    I --> J[Show notification]
-    
-    K[User clicks popup] --> L{x402 detected?}
-    L -->|Yes| M[Show payment details<br/>+ Submit to a2alist.ai]
-    L -->|No| N[Show empty state<br/>+ Browse directory]
+    A[Browser receives response] --> B[Observe payment headers]
+    B --> C[Decode and validate challenge]
+    C --> D[Show detection status and store locally]
+    E[User confirms manual probe] --> F[GET selected URL]
+    F --> C
+    G[User chooses directory submission] --> H[Open sanitized form for review]
 ```
 
 ### Privacy
 
 - No data sent automatically — submission is user-initiated only
 - Discovered sites stored locally in `chrome.storage.local`
-- Extension only makes HEAD/GET probes to detect x402 headers
+- Passive detection does not send probes, replay requests, or fetch discovery paths
+- A manual GET probe requires user confirmation; directory submissions are never automatic
 
 ---
 
 ---
 
-## x402 Discovery Standard
+## Project-specific discovery convention (legacy)
 
-This project introduces `/.well-known/x402.json` as a discovery mechanism for x402-enabled sites. Sites that use x402 on specific endpoints (not the homepage) can advertise their x402 support:
+The CLI/library support the project-specific `/.well-known/x402.json` convention. It is not part of the canonical x402 v2 HTTP transport specification, and the extension does not probe it automatically. Sites that use x402 on specific endpoints (not the homepage) can advertise their x402 support:
 
 ```json
 {
@@ -388,7 +389,7 @@ This project introduces `/.well-known/x402.json` as a discovery mechanism for x4
 }
 ```
 
-This enables passive detection by browser extensions and crawlers without probing every route.
+An explicit CLI/library check may request this document as a discovery fallback. This is an active request, not passive browser observation.
 
 ---
 
@@ -434,12 +435,17 @@ interface FacilitatorResult {
 }
 ```
 
+`ResourceInfo` contains `url` and optional `description`/`mimeType`. `AcceptsEntryV2` requires `scheme`, CAIP-2 `network`, atomic-unit `amount`, `asset`, `payTo`, and positive integer `maxTimeoutSeconds`; `extra` is optional. Legacy v1 `AcceptsEntry` uses `maxAmountRequired` and embeds resource metadata in each option. See `src/types.ts` for the complete exported interfaces.
+
 ### `PaymentRequired`
 
 ```typescript
 interface PaymentRequired {
   x402Version?: number;
-  accepts?: AcceptsEntry[];
+  accepts?: (AcceptsEntry | AcceptsEntryV2)[];
+  resource?: string | ResourceInfo;
+  // v2 extension map entries contain info and schema objects.
+  [key: string]: unknown;
   facilitatorUrl?: string;
   scheme?: string;
   network?: string;
@@ -451,9 +457,21 @@ interface PaymentRequired {
 
 ---
 
+## 1.2.0 changes
+
+- Adds canonical x402 v2 challenge fields and CAIP-2 validation while retaining legacy v1 support.
+- Gives `PAYMENT-REQUIRED` precedence over `X-PAYMENT-REQUIRED`.
+- Updates the standalone Action to validate v1/v2 headers and use Node.js 24 on GitHub runners.
+- Keeps the npm library/CLI Node.js >=18 compatibility target; the Action runtime is separate.
+- Documents passive extension detection and explicit user-confirmed probes.
+
+npm, GitHub Action tags, and Chrome Web Store versions are released separately; check each distribution channel for availability.
+
 ## Related
 
-- [x402.org](https://x402.org) — x402 protocol spec
+- [x402.org](https://x402.org) — x402 protocol
+- [Official v2 specification](https://github.com/coinbase/x402/blob/main/specs/x402-specification-v2.md) — challenge schema and payment flow
+- [GitHub Action metadata](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax) — supported JavaScript action runtimes
 - [coinbase/x402](https://github.com/coinbase/x402) — Reference implementation
 - [a2alist.ai](https://a2alist.ai) — x402 & A2A agent directory
 - [skillpacks.dev](https://skillpacks.dev) — AI skills marketplace (x402-powered)

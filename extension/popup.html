@@ -208,7 +208,7 @@
     .spinner {
       width: 14px; height: 14px;
       border: 2px solid #222; border-top-color: #22c55e;
-      border-radius: 50%; animation: spin .7s linear infinite;
+      border-radius: 50%; animation: spin .7s linear 4;
     }
     .empty-list {
       padding: 28px 16px; text-align: center; color: #555; font-size: 12px; line-height: 1.6;
@@ -222,15 +222,46 @@
       pointer-events: none; white-space: nowrap;
     }
     .toast.show { opacity: 1; }
+
+    /* Finite, compositor-only motion; never implies verified payment. */
+    .logo { width: 32px; height: 32px; background: none; border-radius: 0; }
+    .logo img { display: block; width: 32px; height: 32px; }
+    .header .version, .detail-label, .list-header-count, .disc-meta,
+    .dir-item-desc, .dir-item-url, .loading, .empty-list { color: #a3a3a3; }
+    .tab { color: #a3a3a3; }
+    .url-display { color: #a3a3a3; }
+    button:focus-visible, a:focus-visible {
+      outline: 2px solid #86efac; outline-offset: -3px;
+    }
+    @keyframes reveal { from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); } }
+    @keyframes signal { 0% { transform: scale(.8); opacity: .5; }
+      65% { transform: scale(1.12); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; } }
+    .header { animation: reveal 180ms ease-out both; }
+    .tab-content.active { animation: reveal 160ms ease-out both; }
+    #content { animation: reveal 200ms ease-out both; }
+    body[data-state="detected"] .status-badge .dot { animation: signal 320ms ease-out both; }
+    .logo { position: relative; }
+    body[data-state="detected"] .logo::after {
+      content: ''; position: absolute; width: 7px; height: 7px;
+      right: 4.5px; top: 18px; border-radius: 50%; background: #22c55e;
+      animation: signal 320ms ease-out both;
+    }
+    .spinner { animation: spin .7s linear 4; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      button:active, .btn-link-full:active, .btn-a2alist-hero:active { transform: none; }
+    }
   </style>
 </head>
 <body>
 
   <!-- Header -->
   <div class="header">
-    <div class="logo">x402</div>
+    <div class="logo"><img src="icons/icon32.png" width="32" height="32" alt=""></div>
     <h1>x402 Detector</h1>
-    <span class="version">v1.0.0</span>
+    <span class="version">v1.1.0</span>
   </div>
 
   <!-- Tabs: Current Page | Discovered | Directory -->
@@ -259,7 +290,7 @@
       <!-- Non-x402 empty state -->
       <div id="empty-page-state" class="empty-state-page" style="display:none">
         <div class="empty-icon">🔍</div>
-        <p>This site doesn't support x402 yet.<br>
+        <p>No valid x402 requirements observed.<br>
            Discover x402-enabled AI agents and APIs<br>on the curated directory.</p>
         <a class="btn-a2alist-hero" id="btn-empty-a2alist" href="#">
           Browse x402 agents on a2alist.ai →
@@ -309,7 +340,7 @@
     </div>
     <div class="dir-cta">
       <button class="btn-a2alist" id="btn-dir-open">
-        Browse 61+ agents on a2alist.ai →
+        Browse Browse agents on a2alist.ai →
       </button>
     </div>
   </div>
@@ -317,13 +348,14 @@
   <!-- Footer (always visible) -->
   <div class="footer">
     <a id="footer-a2alist" href="#">
-      <span class="footer-count">61+</span>
+      <span class="footer-count">Browse</span>
       x402 agents on a2alist.ai →
     </a>
   </div>
 
   <div class="toast" id="toast"></div>
 
+  <script src="protocol.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@ export type {
   X402Result,
   PaymentRequired,
   AcceptsEntry,
+  AcceptsEntryV2,
+  ResourceInfo,
   PayTo,
   CheckOptions,
   ValidationResult,

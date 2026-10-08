@@ -40,19 +40,23 @@ export function validateSchema(payload: unknown): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  if (payload === null || typeof payload !== 'object') {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
     return { valid: false, errors: ['Payload must be a non-null object'], warnings };
   }
 
   const p = payload as Record<string, unknown>;
+
+  if (p.x402Version === 2 && !('endpoints' in p && !('accepts' in p))) {
+    return validateV2(p);
+  }
 
   // ── x402Version ──────────────────────────────────────────────────────────
   if (!('x402Version' in p)) {
     errors.push('Missing required field: x402Version');
   } else if (typeof p.x402Version !== 'number') {
     errors.push(`x402Version must be a number, got ${typeof p.x402Version}`);
-  } else if (!Number.isInteger(p.x402Version) || p.x402Version < 1) {
-    warnings.push(`x402Version should be a positive integer (got ${p.x402Version})`);
+  } else if (p.x402Version !== 1 && p.x402Version !== 2) {
+    errors.push(`Unsupported x402Version: ${p.x402Version} (supported: 1, 2)`);
   }
 
   // ── Detect document type ─────────────────────────────────────────────────
@@ -138,4 +142,48 @@ export function validateSchema(payload: unknown): ValidationResult {
  */
 export function validatePaymentRequired(pr: PaymentRequired): ValidationResult {
   return validateSchema(pr as unknown);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Structural challenge validation only; no authorization or settlement proof. */
+function validateV2(p: Record<string, unknown>): ValidationResult {
+  const errors: string[] = [];
+  const text = (value: unknown, path: string) => {
+    if (typeof value !== 'string' || value.trim() === '') errors.push(`${path} must be a non-empty string`);
+  };
+  if (!isRecord(p.resource)) errors.push('resource must be a ResourceInfo object');
+  else {
+    if (!isValidUrl(p.resource.url)) errors.push('resource.url must be a valid http(s) URL');
+    for (const field of ['description', 'mimeType']) {
+      if (field in p.resource && typeof p.resource[field] !== 'string') errors.push(`resource.${field} must be a string`);
+    }
+  }
+  if ('error' in p && typeof p.error !== 'string') errors.push('error must be a string');
+  if ('extensions' in p) {
+    if (!isRecord(p.extensions)) errors.push('extensions must be an object');
+    else for (const [key, value] of Object.entries(p.extensions)) {
+      if (!isRecord(value) || !isRecord(value.info) || !isRecord(value.schema)) {
+        errors.push(`extensions.${key} must contain info and schema objects`);
+      }
+    }
+  }
+  if (!Array.isArray(p.accepts) || p.accepts.length === 0) errors.push('accepts must contain at least one entry');
+  else p.accepts.forEach((entry: unknown, i: number) => {
+    const path = `accepts[${i}]`;
+    if (!isRecord(entry)) { errors.push(`${path} must be an object`); return; }
+    for (const field of ['scheme', 'network', 'amount', 'asset', 'payTo']) text(entry[field], `${path}.${field}`);
+    if (typeof entry.network !== 'string' || !/^[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}$/.test(entry.network)) {
+      errors.push(`${path}.network must use CAIP-2 format`);
+    }
+    if (typeof entry.amount !== 'string' || !/^\d+$/.test(entry.amount)) errors.push(`${path}.amount must be an unsigned atomic-unit integer string`);
+    if (typeof entry.maxTimeoutSeconds !== 'number' || !Number.isSafeInteger(entry.maxTimeoutSeconds) || entry.maxTimeoutSeconds <= 0) {
+      errors.push(`${path}.maxTimeoutSeconds must be a positive safe integer`);
+    }
+    if ('extra' in entry && !isRecord(entry.extra)) errors.push(`${path}.extra must be an object`);
+  });
+  if ('facilitatorUrl' in p && !isValidUrl(p.facilitatorUrl)) errors.push('facilitatorUrl must be a valid http(s) URL');
+  return { valid: errors.length === 0, errors, warnings: [] };
 }
