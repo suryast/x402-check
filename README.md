@@ -457,7 +457,7 @@ interface PaymentRequired {
 
 ---
 
-## 1.2.0 release candidate
+## 1.2.0 changes
 
 - Adds canonical x402 v2 challenge fields and CAIP-2 validation while retaining legacy v1 support.
 - Gives `PAYMENT-REQUIRED` precedence over `X-PAYMENT-REQUIRED`.
@@ -465,7 +465,7 @@ interface PaymentRequired {
 - Keeps the npm library/CLI Node.js >=18 compatibility target; the Action runtime is separate.
 - Documents passive extension detection and explicit user-confirmed probes.
 
-This is a release candidate, not a claim that npm, GitHub Action tags, or the Chrome Web Store have been updated.
+npm, GitHub Action tags, and Chrome Web Store versions are released separately; check each distribution channel for availability.
 
 ## Related
 
